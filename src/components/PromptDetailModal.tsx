@@ -94,18 +94,18 @@ export function PromptDetailModal({
               {status === 'ok' && currentUrl ? (
                 <img src={currentUrl} alt="" className="detail-img" />
               ) : status === 'loading' || status === 'idle' ? (
-                <div className="cover-placeholder shimmer" aria-hidden>
+                <div className="cover-placeholder shimmer detail-ph" aria-hidden>
                   <span>加载中…</span>
                 </div>
               ) : (
-                <div className="cover-placeholder" aria-hidden>
+                <div className="cover-placeholder detail-ph" aria-hidden>
                   <span className="cover-icon">✦</span>
                   <span>暂无效果图</span>
                 </div>
               )}
 
               {count > 0 && (
-                <span className="cover-badge">
+                <span className="cover-badge detail-badge">
                   {index + 1}/{count}
                 </span>
               )}
@@ -138,30 +138,30 @@ export function PromptDetailModal({
           </div>
 
           <div className="detail-side">
-            <h2 id="detail-modal-title" className="detail-title">
-              {title}
-            </h2>
-
-            {prompt.keywords.length > 0 && (
-              <div className="card-tags detail-tags">
-                {prompt.keywords.map((kw) => (
-                  <TagCapsule key={kw} label={kw} />
-                ))}
+            <div className="detail-side-top">
+              <div className="detail-side-meta">
+                <h2 id="detail-modal-title" className="detail-title">
+                  {title}
+                </h2>
+                {prompt.keywords.length > 0 && (
+                  <div className="card-tags detail-tags">
+                    {prompt.keywords.map((kw) => (
+                      <TagCapsule key={kw} label={kw} />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-
-            <div className="detail-prompt-wrap">
-              <pre className="detail-prompt">{prompt.content}</pre>
-            </div>
-
-            <div className="detail-actions">
               <button
                 type="button"
-                className="btn primary"
+                className="btn sm primary detail-copy-btn"
                 onClick={() => void handleCopy()}
               >
                 {copied ? '已复制' : '复制提示词'}
               </button>
+            </div>
+
+            <div className="detail-prompt-wrap">
+              <pre className="detail-prompt">{prompt.content}</pre>
             </div>
           </div>
         </div>
