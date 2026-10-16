@@ -243,7 +243,7 @@ export type FeaturedRemoteResult = {
   sha: string | null
 }
 
-/** Load data/prompt_featured.json; missing file → empty map. */
+/** Load data/prompt_featured.json; missing file → empty map (no throw). */
 export async function loadFeaturedRemote(
   settings: GithubSettings,
 ): Promise<FeaturedRemoteResult> {
@@ -251,10 +251,22 @@ export async function loadFeaturedRemote(
   const bust = `_=${Date.now()}`
   const apiPath = `/repos/${owner}/${name}/contents/${FEATURED_PATH}?ref=${encodeURIComponent(DEFAULT_BRANCH)}&${bust}`
   const res = await githubFetch(settings, apiPath)
+  // File not created yet — silent empty. Do not toast.
   if (res.status === 404) {
     return { map: {}, sha: null }
   }
-  if (!res.ok) await parseError(res)
+  if (!res.ok) {
+    // Some gateways surface missing private paths oddly; only soft-handle true Not Found.
+    try {
+      const body = (await res.clone().json()) as { message?: string }
+      if (/not found/i.test(body.message ?? '')) {
+        return { map: {}, sha: null }
+      }
+    } catch {
+      // ignore parse
+    }
+    await parseError(res)
+  }
   const data = (await res.json()) as GithubFileContent
   if (data.encoding !== 'base64' || typeof data.content !== 'string') {
     throw new GithubApiError(422, '无法解码精选文件')

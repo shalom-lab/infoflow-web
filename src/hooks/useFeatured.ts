@@ -4,7 +4,7 @@ import {
   saveFeaturedRemote,
 } from '../github/client'
 import { isConfigured } from '../github/storage'
-import type { GithubSettings } from '../github/types'
+import { GithubApiError, type GithubSettings } from '../github/types'
 import {
   getFeaturedCache,
   putFeaturedCache,
@@ -16,6 +16,8 @@ const DEBOUNCE_MS = 1600
 /**
  * Featured stars: local IDB first, debounce then silent batch write to
  * data/prompt_featured.json. Does not touch data_all_prompts.json.
+ *
+ * Missing remote file (404) → empty map, no toast.
  */
 export function useFeatured(
   settings: GithubSettings,
@@ -30,6 +32,9 @@ export function useFeatured(
   const timerRef = useRef<number | null>(null)
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  // Stable notice callback — avoid re-hydrate loops when parent passes inline fn
+  const onNoticeRef = useRef(onNotice)
+  onNoticeRef.current = onNotice
 
   useEffect(() => {
     mapRef.current = map
@@ -67,17 +72,25 @@ export function useFeatured(
       shaRef.current = result.sha
       await persistLocal(mapRef.current, result.sha, false)
       setCanSync(true)
-      onNotice?.('精选已同步到 GitHub', 'success')
+      onNoticeRef.current?.('精选已同步到 GitHub', 'success')
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      // Keep local dirty; allow offline starring
       setCanSync(false)
-      onNotice?.(
-        `精选已保存在本地，但无法写回 GitHub（${msg}）。请确认 PAT 有 Contents 写权限。`,
-        'warn',
-      )
+      const status = e instanceof GithubApiError ? e.status : 0
+      // Only warn on real write failures (auth / permission / conflict)
+      if (status === 401 || status === 403 || status === 409 || status === 422) {
+        const msg = e instanceof Error ? e.message : String(e)
+        onNoticeRef.current?.(
+          `精选已保存在本地，但无法写回 GitHub（${msg}）。请确认 PAT 有 Contents 写权限。`,
+          'warn',
+        )
+      } else if (e instanceof Error) {
+        onNoticeRef.current?.(
+          `精选已保存在本地，写回失败：${e.message}`,
+          'warn',
+        )
+      }
     }
-  }, [onNotice, persistLocal])
+  }, [persistLocal])
 
   const scheduleFlush = useCallback(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current)
@@ -105,10 +118,10 @@ export function useFeatured(
       dirtyRef.current = local.dirty
     }
     try {
+      // 404 → empty map + sha null (loadFeaturedRemote already soft-handles)
       const remote = await loadFeaturedRemote(s)
       setCanSync(true)
       if (local?.dirty) {
-        // Keep local dirty map; update sha if remote exists for later RMW
         if (remote.sha && !local.remoteSha) {
           setRemoteSha(remote.sha)
           shaRef.current = remote.sha
@@ -121,17 +134,37 @@ export function useFeatured(
         shaRef.current = remote.sha
         await persistLocal(remote.map, remote.sha, false)
       }
-    } catch {
-      setCanSync(false)
-      if (!local) {
-        setMap({})
+    } catch (e) {
+      // Missing file must never reach here; only auth/network etc.
+      if (!local) setMap({})
+      const status = e instanceof GithubApiError ? e.status : 0
+      if (status === 404) {
+        // Belt-and-suspenders: treat as empty, silent
+        setCanSync(true)
+        setRemoteSha(null)
+        shaRef.current = null
+        if (!local?.dirty) {
+          setMap({})
+          mapRef.current = {}
+          await persistLocal({}, null, false)
+        }
+        return
       }
-      onNotice?.(
-        '无法拉取远程精选；本地标记仍可用，写回需 Contents 写权限。',
-        'warn',
-      )
+      setCanSync(false)
+      if (status === 401 || status === 403) {
+        onNoticeRef.current?.(
+          '无法读取远程精选（认证/权限）。本地标记仍可用；写回需 Contents 写权限。',
+          'warn',
+        )
+      } else if (e instanceof TypeError || (e instanceof Error && /network|fetch/i.test(e.message))) {
+        onNoticeRef.current?.(
+          '网络异常，无法读取远程精选；本地标记仍可用。',
+          'warn',
+        )
+      }
+      // Other errors: silent keep local — avoid toast spam
     }
-  }, [onNotice, persistLocal, scheduleFlush])
+  }, [persistLocal, scheduleFlush])
 
   useEffect(() => {
     void hydrate()
@@ -158,12 +191,15 @@ export function useFeatured(
         if (isConfigured(s)) {
           scheduleFlush()
         } else {
-          onNotice?.('精选已保存在本地（未配置 PAT，无法同步到 GitHub）', 'warn')
+          onNoticeRef.current?.(
+            '精选已保存在本地（未配置 PAT，无法同步到 GitHub）',
+            'warn',
+          )
         }
         return next
       })
     },
-    [onNotice, persistLocal, scheduleFlush],
+    [persistLocal, scheduleFlush],
   )
 
   return { map, isFeatured, toggleFeatured, canSync, reload: hydrate }
