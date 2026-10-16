@@ -9,7 +9,7 @@ export type ImageLoadStatus = 'idle' | 'loading' | 'ok' | 'empty'
 
 /**
  * Discover consecutive {promptId}-N.png images (stop at first miss).
- * Optional lazy: only start after the root element enters the viewport.
+ * Optional lazy: start when entering viewport; leave cancels in-flight queue work.
  */
 export function usePromptImages(
   promptId: string,
@@ -33,43 +33,45 @@ export function usePromptImages(
     if (!el) return
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setVisible(true)
-          io.disconnect()
-        }
+        const show = entries.some((e) => e.isIntersecting)
+        setVisible(show)
       },
-      { rootMargin: '140px' },
+      { rootMargin: '160px' },
     )
     io.observe(el)
     return () => io.disconnect()
   }, [lazy])
 
   useEffect(() => {
-    if (!visible) return
+    if (!visible) {
+      // Leaving viewport: stop further discovery (queued fetches abort).
+      return
+    }
     if (!enabled || !settings) {
       setUrls([])
       setStatus('empty')
       return
     }
 
+    const ac = new AbortController()
     let cancelled = false
-    setStatus('loading')
-    setUrls([])
+    setStatus((s) => (s === 'ok' ? s : 'loading'))
 
     void (async () => {
       const found: string[] = []
       for (let i = 0; i < max; i++) {
-        if (cancelled) return
+        if (cancelled || ac.signal.aborted) return
         const path = imagePathFor(promptId, i)
-        const blobUrl = await fetchPrivateImage(settings, path)
-        if (cancelled) return
+        const blobUrl = await fetchPrivateImage(settings, path, {
+          signal: ac.signal,
+        })
+        if (cancelled || ac.signal.aborted) return
         if (!blobUrl) break
         found.push(blobUrl)
-        // Progressive update so first frame paints early
         setUrls([...found])
         setStatus('ok')
       }
-      if (cancelled) return
+      if (cancelled || ac.signal.aborted) return
       if (found.length === 0) {
         setUrls([])
         setStatus('empty')
@@ -81,6 +83,7 @@ export function usePromptImages(
 
     return () => {
       cancelled = true
+      ac.abort()
     }
   }, [visible, enabled, settings, promptId, max])
 

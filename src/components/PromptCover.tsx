@@ -27,7 +27,8 @@ export function PromptCover({
     promptId,
     settings,
     enabled,
-    { lazy: true },
+    // Cards only need cover (+ few probes for badge); modal loads the rest.
+    { lazy: true, max: 3 },
   )
 
   const clickable = Boolean(onClick)
@@ -65,7 +66,7 @@ export function PromptCover({
 
       {status === 'ok' && count > 0 && (
         <span className="cover-badge" title={`${count} 张效果图`}>
-          {count}张
+          {count >= 3 ? `${count}+` : `${count}`}张
         </span>
       )}
 

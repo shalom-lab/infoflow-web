@@ -10,10 +10,12 @@ import {
   type FeaturedMap,
 } from '../types/featured'
 import { normalizePrompts, type PromptItem } from '../types/prompt'
+import { enqueue, sleep } from './queue'
 import {
   DEFAULT_BRANCH,
   FEATURED_PATH,
   GithubApiError,
+  isRateLimitHint,
   parseRepo,
   PROMPTS_PATH,
   type GithubFileContent,
@@ -81,7 +83,9 @@ async function parseError(res: Response): Promise<never> {
   } catch {
     // ignore
   }
-  throw new GithubApiError(res.status, message)
+  const rateLimited =
+    res.status === 429 || isRateLimitHint(res, message) || (res.status === 403 && isRateLimitHint(res, message))
+  throw new GithubApiError(res.status, message, rateLimited)
 }
 
 function decodeBase64ToUtf8(b64: string): string {
@@ -168,62 +172,164 @@ export async function testConnection(settings: GithubSettings): Promise<string> 
   return `${data.full_name}${data.private ? ' (private)' : ' (public)'}`
 }
 
-/** In-memory blob URL cache for private-repo images (session). */
-const imageCache = new Map<string, Promise<string | null>>()
+/** Successful object URLs (session). */
+const imageUrlCache = new Map<string, string>()
+/** Definitive 404 misses (session). */
+const imageMissCache = new Set<string>()
+/** In-flight network/IDB lookups. */
+const imageInflight = new Map<string, Promise<string | null>>()
 
 function memKey(settings: GithubSettings, path: string): string {
   return `${settings.repo.trim()}|${path}`
 }
 
+function isAbortError(e: unknown): boolean {
+  return (
+    (e instanceof DOMException && e.name === 'AbortError') ||
+    (e instanceof Error && e.name === 'AbortError')
+  )
+}
+
+const IMAGE_MAX_RETRIES = 4
+
+async function fetchImageNetwork(
+  settings: GithubSettings,
+  path: string,
+  signal: AbortSignal,
+): Promise<Blob | null> {
+  const { owner, name } = requireRepo(settings)
+  const apiPath = `/repos/${owner}/${name}/contents/${encodeURI(path)}?ref=${encodeURIComponent(DEFAULT_BRANCH)}`
+
+  let attempt = 0
+  while (attempt <= IMAGE_MAX_RETRIES) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    const res = await githubFetch(settings, apiPath, {
+      headers: { Accept: 'application/vnd.github.raw' },
+      signal,
+    })
+    if (res.status === 404) return null
+    if (res.ok) {
+      const blob = await res.blob()
+      return blob.size > 0 ? blob : null
+    }
+
+    let message = res.statusText || ''
+    try {
+      const body = (await res.clone().json()) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      // ignore
+    }
+    const rateLimited =
+      res.status === 429 || isRateLimitHint(res, message)
+
+    if ((rateLimited || res.status === 403 || res.status === 502 || res.status === 503) && attempt < IMAGE_MAX_RETRIES) {
+      const retryAfter = Number(res.headers.get('retry-after') || '')
+      const backoff = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : Math.min(16000, 500 * 2 ** attempt) + Math.random() * 200
+      attempt++
+      await sleep(backoff, signal)
+      continue
+    }
+
+    // Soft-fail for images — avoid toast spam from masonry
+    return null
+  }
+  return null
+}
+
+export type FetchPrivateImageOpts = {
+  signal?: AbortSignal
+}
+
 /**
  * Fetch a private-repo image via Contents API raw + Authorization.
- * Checks IndexedDB blob store, then network; writes IDB on miss.
- * Returns an object URL, or null on 404 / failure.
+ * IDB first (no queue); network goes through a global concurrency queue
+ * with exponential backoff on rate limits.
  */
 export function fetchPrivateImage(
   settings: GithubSettings,
   path: string,
+  opts?: FetchPrivateImageOpts,
 ): Promise<string | null> {
   const key = memKey(settings, path)
-  const hit = imageCache.get(key)
-  if (hit) return hit
+  const signal = opts?.signal
+
+  if (signal?.aborted) return Promise.resolve(null)
+
+  const hitUrl = imageUrlCache.get(key)
+  if (hitUrl) return Promise.resolve(hitUrl)
+  if (imageMissCache.has(key)) return Promise.resolve(null)
+
+  const inflight = imageInflight.get(key)
+  if (inflight) {
+    // Share in-flight; still honor caller abort by racing
+    if (!signal) return inflight
+    return new Promise((resolve) => {
+      let settled = false
+      const onAbort = () => {
+        if (!settled) {
+          settled = true
+          resolve(null)
+        }
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+      void inflight.then((url) => {
+        if (!settled) {
+          settled = true
+          signal.removeEventListener('abort', onAbort)
+          resolve(signal.aborted ? null : url)
+        }
+      })
+    })
+  }
 
   const promise = (async (): Promise<string | null> => {
     const repo = settings.repo.trim()
     try {
+      // IndexedDB — outside rate-limit queue
       const cached = await getImageBlob(repo, path)
+      if (signal?.aborted) return null
       if (cached && cached.size > 0) {
-        return URL.createObjectURL(cached)
+        const url = URL.createObjectURL(cached)
+        imageUrlCache.set(key, url)
+        return url
       }
 
-      const { owner, name } = requireRepo(settings)
-      const apiPath = `/repos/${owner}/${name}/contents/${encodeURI(path)}?ref=${encodeURIComponent(DEFAULT_BRANCH)}`
-      const res = await githubFetch(settings, apiPath, {
-        headers: { Accept: 'application/vnd.github.raw' },
-      })
-      if (res.status === 404) return null
-      if (!res.ok) return null
-      const blob = await res.blob()
-      if (!blob.size) return null
+      // Network — queued + retries
+      const blob = await enqueue(
+        (queueSignal) => fetchImageNetwork(settings, path, queueSignal),
+        signal,
+      )
+      if (!blob) {
+        imageMissCache.add(key)
+        return null
+      }
       void putImageBlob(repo, path, blob)
-      return URL.createObjectURL(blob)
-    } catch {
+      const url = URL.createObjectURL(blob)
+      imageUrlCache.set(key, url)
+      return url
+    } catch (e) {
+      if (isAbortError(e)) return null
       return null
+    } finally {
+      imageInflight.delete(key)
     }
   })()
 
-  imageCache.set(key, promise)
+  imageInflight.set(key, promise)
   return promise
 }
 
 /** Drop in-memory blob URLs (e.g. after clearing settings/cache). */
 export function clearImageCache(): void {
-  for (const p of imageCache.values()) {
-    void p.then((url) => {
-      if (url) URL.revokeObjectURL(url)
-    })
+  for (const url of imageUrlCache.values()) {
+    URL.revokeObjectURL(url)
   }
-  imageCache.clear()
+  imageUrlCache.clear()
+  imageMissCache.clear()
+  imageInflight.clear()
 }
 
 /** Load public demo fixture when BYOK is not configured. */

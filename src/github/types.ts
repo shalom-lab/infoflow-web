@@ -46,27 +46,52 @@ export interface GithubFileContent {
 
 export class GithubApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** True when GitHub secondary/primary rate limit (not a PAT scope issue). */
+  rateLimited: boolean
+  constructor(status: number, message: string, rateLimited = false) {
     super(message)
     this.name = 'GithubApiError'
     this.status = status
+    this.rateLimited = rateLimited
   }
+}
+
+/** Detect rate-limit from headers + body message. */
+export function isRateLimitHint(
+  res: Response | null,
+  message: string,
+): boolean {
+  if (/rate.?limit|API rate limit exceeded|secondary rate|abuse.?detect/i.test(message)) {
+    return true
+  }
+  if (!res) return false
+  const remaining = res.headers.get('x-ratelimit-remaining')
+  if (remaining === '0') return true
+  if (res.headers.get('retry-after')) return true
+  const reset = res.headers.get('x-ratelimit-reset')
+  if (remaining !== null && Number(remaining) === 0 && reset) return true
+  return false
 }
 
 export function friendlyGithubError(err: unknown): string {
   if (err instanceof GithubApiError) {
     const msg = err.message || ''
+    if (err.rateLimited || (err.status === 403 && isRateLimitHint(null, msg))) {
+      return 'API 限流，稍后重试（大量效果图请求触发了 GitHub 速率限制，不是 PAT 权限问题）。'
+    }
     switch (err.status) {
       case 401:
         return '认证失败 (401)：PAT 无效或已过期，请在设置中更新。'
       case 403:
-        return '权限不足 (403)：PAT 需要 Contents 读写权限，或触发了 API 限流。'
+        return '权限不足 (403)：PAT 需要 Contents 读写权限。'
       case 404:
         return '未找到 (404)：仓库/分支/路径不存在，或 PAT 无权访问私有仓库。'
       case 409:
         return '冲突 (409)：文件已被修改，请稍后重试同步精选。'
       case 422:
         return `请求无效 (422)：${msg}`
+      case 429:
+        return 'API 限流，稍后重试。'
       default:
         return `GitHub API 错误 (${err.status})：${msg}`
     }
