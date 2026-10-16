@@ -28,7 +28,7 @@ export function normalizePrompts(data: unknown): PromptItem[] {
   })
 }
 
-/** Convention image path for private InfoFlow repo. */
+/** Convention image path inside the configured private data repo. */
 export function imagePathFor(promptId: string, index = 0): string {
   return `infoflow-data/Images/Prompt/${promptId}-${index}.png`
 }

@@ -236,8 +236,8 @@ export function HomePage({ settings }: Props) {
           <div>
             <strong>尚未配置 BYOK</strong>
             <p>
-              请前往 <Link to="/settings">设置</Link> 填写{' '}
-              <code>shalom-lab/InfoFlow</code> 与 PAT（
+              请前往 <Link to="/settings">设置</Link> 填写你的 Prompt 数据仓{' '}
+              <code>owner/repo</code> 与 PAT（
               <code>gh-infoflow-repo</code> / <code>gh-infoflow-token</code>
               ）。
             </p>

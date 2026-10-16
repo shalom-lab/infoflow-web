@@ -12,7 +12,7 @@ import {
   DEFAULT_SETTINGS,
   friendlyGithubError,
   maskToken,
-  SUGGESTED_REPO,
+  REPO_PLACEHOLDER,
   type GithubSettings,
 } from '../github/types'
 import {
@@ -78,7 +78,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
   const handleSave = () => {
     const next: GithubSettings = {
       token: tokenInput.trim() || saved.token,
-      repo: repoInput.trim() || SUGGESTED_REPO,
+      repo: repoInput.trim(),
     }
     if (!next.token.trim()) {
       setErr('请填写 GitHub PAT')
@@ -142,7 +142,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
     try {
       const candidate: GithubSettings = {
         token: tokenInput.trim() || saved.token,
-        repo: repoInput.trim() || saved.repo || SUGGESTED_REPO,
+        repo: repoInput.trim() || saved.repo,
       }
       if (!isConfigured(candidate)) {
         throw new Error('请先填写 PAT 与 owner/repo')
@@ -172,14 +172,14 @@ export function SettingsPage({ settings, onSaved }: Props) {
           <code>{KEY_TOKEN}</code> / <code>{KEY_REPO}</code>
           ），不会写入任何代码或提交。需要权限：
           <strong>Contents: Read</strong>（经典 token 勾选 <code>repo</code>
-          以读私有仓 InfoFlow）。可 Settings 填写，也可事先写入
+          以读私有数据仓）。可 Settings 填写，也可事先写入
           localStorage；启动会自动读。
         </p>
         <p className="hint muted">
           数据文件默认读取仓库中的{' '}
           <code>data/data_all_prompts.json</code>（分支{' '}
-          <code>master</code>）。仓库填写 <code>owner/repo</code>，建议{' '}
-          <code>{SUGGESTED_REPO}</code>。
+          <code>master</code>）。仓库填写单个{' '}
+          <code>{REPO_PLACEHOLDER}</code>。
         </p>
 
         <hr className="settings-divider" />
@@ -189,7 +189,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
             仓库 <span className="status-pill">{repoStatus}</span>
           </span>
           <input
-            placeholder={`owner/repo（默认建议 ${SUGGESTED_REPO}）`}
+            placeholder={REPO_PLACEHOLDER}
             spellCheck={false}
             value={repoInput}
             onChange={(e) => setRepoInput(e.target.value.trim())}

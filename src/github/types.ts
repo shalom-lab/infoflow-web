@@ -10,10 +10,10 @@ export const DEFAULT_SETTINGS: GithubSettings = {
   repo: '',
 }
 
-/** Suggested default when Settings repo field is empty. */
-export const SUGGESTED_REPO = 'shalom-lab/InfoFlow'
+/** Placeholder text only — never a real default repo. */
+export const REPO_PLACEHOLDER = 'owner/repo'
 
-/** InfoFlow default branch is master (not main). */
+/** Data-repo default branch (Contents API). */
 export const DEFAULT_BRANCH = 'master'
 export const PROMPTS_PATH = 'data/data_all_prompts.json'
 /** Side-channel featured map — does NOT alter data_all_prompts.json fields. */
