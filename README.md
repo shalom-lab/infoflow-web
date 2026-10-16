@@ -67,6 +67,14 @@ npm run preview
 
 数据文件（非 BYOK 键，应用内默认）：分支 `master`、路径 `data/data_all_prompts.json`。
 
+## 本地缓存（IndexedDB）
+
+- 库名：`infoflow-web`
+- 对象仓：`prompts`（按 `owner/repo` 存列表 + `sha` / `etag` / `updatedAt`）、`images`（效果图 Blob，键 `repo|path`）
+- 启动：有缓存先展示 → 后台重新拉取 Contents；用文件 sha 对比，有变化才更新 UI 与 IDB（并保存 etag 元数据）
+- Settings：**清除缓存**；首页 / Settings 链接触发 **强制刷新**
+- PAT 仍只在 `localStorage`，不进 IndexedDB
+
 ## 已知限制
 
 - 约 139/396 条有 `{prompt_id}-N.png` 约定命名效果图；更早条目图片 ID 可能与 `prompt_id` 不一致，当前不额外拉取每条 md（避免 API 打爆），这些卡会显示占位

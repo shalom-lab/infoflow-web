@@ -15,6 +15,10 @@ import {
   SUGGESTED_REPO,
   type GithubSettings,
 } from '../github/types'
+import {
+  clearAllLocalCache,
+  getCacheStats,
+} from '../idb/cache'
 
 interface Props {
   settings: GithubSettings
@@ -28,11 +32,39 @@ export function SettingsPage({ settings, onSaved }: Props) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [cacheInfo, setCacheInfo] = useState<string>('检查中…')
+
+  const refreshCacheInfo = async (repo: string) => {
+    try {
+      const stats = await getCacheStats(repo.trim() || undefined)
+      if (!stats.hasPrompts && stats.imageCount === 0) {
+        setCacheInfo('无本地缓存')
+        return
+      }
+      const parts: string[] = []
+      if (stats.hasPrompts) {
+        parts.push(
+          `提示词 ${stats.promptCount} 条${
+            stats.updatedAt
+              ? `（${new Date(stats.updatedAt).toLocaleString('zh-CN', { hour12: false })}）`
+              : ''
+          }`,
+        )
+      }
+      if (stats.imageCount > 0) {
+        parts.push(`效果图 blob ${stats.imageCount} 张`)
+      }
+      setCacheInfo(parts.join(' · '))
+    } catch {
+      setCacheInfo('无法读取缓存状态')
+    }
+  }
 
   useEffect(() => {
     setSaved(settings)
     setRepoInput(settings.repo || '')
     setTokenInput('')
+    void refreshCacheInfo(settings.repo)
   }, [settings])
 
   const tokenStatus = saved.token.trim()
@@ -61,6 +93,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
     onSaved(next)
     setMsg('已保存到浏览器 localStorage（不会提交到仓库）')
     setErr(null)
+    void refreshCacheInfo(next.repo)
   }
 
   const handleClear = () => {
@@ -74,6 +107,29 @@ export function SettingsPage({ settings, onSaved }: Props) {
     onSaved(empty)
     setMsg('已清除本地设置')
     setErr(null)
+  }
+
+  const handleClearCache = async () => {
+    if (
+      !confirm(
+        '确定清除 IndexedDB 中的提示词列表与效果图缓存？下次将重新从 GitHub 拉取。',
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    setMsg(null)
+    setErr(null)
+    try {
+      await clearAllLocalCache()
+      clearImageCache()
+      setMsg('已清除本地 IndexedDB 缓存（PAT / 仓库设置保留）')
+      await refreshCacheInfo(saved.repo)
+    } catch (e) {
+      setErr(friendlyGithubError(e))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleTest = async () => {
@@ -160,7 +216,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
 
         <div className="settings-actions">
           <button type="button" className="btn danger" onClick={handleClear}>
-            清除
+            清除密钥
           </button>
           <div className="spacer" />
           <button
@@ -175,6 +231,36 @@ export function SettingsPage({ settings, onSaved }: Props) {
             保存
           </button>
         </div>
+      </section>
+
+      <section className="settings-card" style={{ marginTop: '1.15rem' }}>
+        <h2>本地缓存（IndexedDB）</h2>
+        <p className="hint">
+          提示词列表与效果图 blob 缓存在浏览器 IndexedDB（库名{' '}
+          <code>infoflow-web</code>
+          ）。启动时先展示缓存，再后台对比 GitHub（ETag / sha），有变化才更新。
+          PAT 不写入 IndexedDB。
+        </p>
+        <p className="hint muted">
+          当前状态：<strong>{cacheInfo}</strong>
+        </p>
+        <div className="settings-actions">
+          <button
+            type="button"
+            className="btn danger"
+            disabled={busy}
+            onClick={() => void handleClearCache()}
+          >
+            清除缓存
+          </button>
+          <div className="spacer" />
+          <Link to="/?force=1" className="btn primary" replace={false}>
+            回首页强制刷新
+          </Link>
+        </div>
+        <p className="hint muted" style={{ marginTop: '0.75rem' }}>
+          或在首页点击「强制刷新」。清除缓存后返回首页会自动重新拉取。
+        </p>
       </section>
     </div>
   )

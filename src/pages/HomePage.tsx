@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { KeywordFilter } from '../components/KeywordFilter'
 import { PromptCard } from '../components/PromptCard'
 import { PromptDetailModal } from '../components/PromptDetailModal'
 import { SearchBar } from '../components/SearchBar'
-import { loadDemoPrompts, loadPrompts } from '../github/client'
+import {
+  loadDemoPrompts,
+  loadPromptsRemote,
+  savePromptsToCache,
+} from '../github/client'
 import { isConfigured } from '../github/storage'
 import { friendlyGithubError, type GithubSettings } from '../github/types'
+import { getPromptsCache } from '../idb/cache'
 import type { PromptItem } from '../types/prompt'
 
 interface Props {
@@ -25,6 +30,15 @@ function matchesQuery(p: PromptItem, q: string): boolean {
     .every((term) => hay.includes(term))
 }
 
+function formatCacheTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('zh-CN', { hour12: false })
+  } catch {
+    return iso
+  }
+}
+
 export function HomePage({ settings }: Props) {
   const [prompts, setPrompts] = useState<PromptItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -34,38 +48,118 @@ export function HomePage({ settings }: Props) {
   const [query, setQuery] = useState('')
   const [keyword, setKeyword] = useState<string | null>(null)
   const [detailPrompt, setDetailPrompt] = useState<PromptItem | null>(null)
-
   const configured = isConfigured(settings)
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setInfo(null)
-    try {
-      if (isConfigured(settings)) {
-        const list = await loadPrompts(settings)
-        setPrompts(list)
-        setDemoMode(false)
-        setInfo(`已从 ${settings.repo} 加载 ${list.length} 条提示词`)
-      } else {
-        const list = await loadDemoPrompts()
-        setPrompts(list)
-        setDemoMode(true)
-        setInfo(
-          '当前为演示数据。请在设置中填写 InfoFlow 私有仓 owner/repo 与 PAT 以加载完整库。',
-        )
+  /**
+   * Stale-while-revalidate:
+   * 1) show IndexedDB cache immediately
+   * 2) fetch remote in background; update UI + IDB only when sha/etag changes
+   * force=true skips conditional headers and always replaces cache.
+   */
+  const refresh = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true
+      setError(null)
+
+      if (!isConfigured(settings)) {
+        setLoading(true)
+          try {
+          const list = await loadDemoPrompts()
+          setPrompts(list)
+          setDemoMode(true)
+          setInfo(
+            '当前为演示数据。请在设置中填写 InfoFlow 私有仓 owner/repo 与 PAT 以加载完整库。',
+          )
+        } catch (e) {
+          setError(friendlyGithubError(e))
+          setPrompts([])
+        } finally {
+          setLoading(false)
+        }
+        return
       }
-    } catch (e) {
-      setError(friendlyGithubError(e))
-      setPrompts([])
-    } finally {
-      setLoading(false)
-    }
-  }, [settings])
+
+      setDemoMode(false)
+      const repo = settings.repo.trim()
+
+      // 1) Hydrate from IndexedDB first (unless force and we want spinner-only —
+      //    still show cache while forcing network for snappy UX)
+      let cachedSha: string | null = null
+      let cachedUpdatedAt: string | null = null
+      try {
+        const cached = await getPromptsCache(repo)
+        if (cached && cached.prompts.length > 0) {
+          setPrompts(cached.prompts)
+          cachedSha = cached.sha
+          cachedUpdatedAt = cached.updatedAt
+          if (!force) {
+            setInfo(
+              `已显示本地缓存 ${cached.prompts.length} 条（${formatCacheTime(cached.updatedAt)}），正在后台检查更新…`,
+            )
+          }
+        } else {
+          setLoading(true)
+          setInfo(null)
+        }
+      } catch {
+        setLoading(true)
+      }
+
+      // 2) Background / forced remote fetch
+      setLoading(true)
+      try {
+        const remote = await loadPromptsRemote(settings, { force })
+
+        const unchanged =
+          !force &&
+          cachedSha != null &&
+          remote.sha === cachedSha &&
+          remote.prompts.length > 0
+
+        if (unchanged) {
+          const when = cachedUpdatedAt
+            ? `缓存于 ${formatCacheTime(cachedUpdatedAt)}`
+            : ''
+          setInfo(
+            `远程未变化（${remote.prompts.length} 条，sha 一致）。继续使用本地缓存。${when}`,
+          )
+          return
+        }
+
+        setPrompts(remote.prompts)
+        await savePromptsToCache(settings, remote)
+        setInfo(
+          force
+            ? `已强制刷新：从 ${repo} 写入本地 ${remote.prompts.length} 条`
+            : `已更新：从 ${repo} 同步 ${remote.prompts.length} 条并写入本地缓存`,
+        )
+      } catch (e) {
+        // Keep showing cache if we have it
+        setError(friendlyGithubError(e))
+        if (cachedSha) {
+          setInfo('远程拉取失败，仍显示本地缓存。')
+        } else {
+          setPrompts([])
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [settings],
+  )
+
+  const forceFlag = searchParams.get('force') === '1'
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void refresh({ force: forceFlag }).then(() => {
+      if (forceFlag) {
+        const next = new URLSearchParams(searchParams)
+        next.delete('force')
+        setSearchParams(next, { replace: true })
+      }
+    })
+  }, [refresh, forceFlag, searchParams, setSearchParams])
 
   const topKeywords = useMemo(() => {
     const counts = new Map<string, number>()
@@ -87,7 +181,6 @@ export function HomePage({ settings }: Props) {
     })
   }, [prompts, query, keyword])
 
-  // Newest first
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) =>
       (b.savedAt || '').localeCompare(a.savedAt || ''),
@@ -111,9 +204,10 @@ export function HomePage({ settings }: Props) {
             type="button"
             className="btn"
             disabled={loading}
-            onClick={() => void refresh()}
+            onClick={() => void refresh({ force: true })}
+            title="忽略缓存条件请求，强制从 GitHub 拉取并写回 IndexedDB"
           >
-            {loading ? '加载中…' : '刷新'}
+            {loading ? '同步中…' : '强制刷新'}
           </button>
           <Link to="/settings" className="btn primary">
             设置

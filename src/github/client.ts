@@ -1,3 +1,9 @@
+import {
+  getImageBlob,
+  putImageBlob,
+  putPromptsCache,
+  type PromptsCacheRecord,
+} from '../idb/cache'
 import { normalizePrompts, type PromptItem } from '../types/prompt'
 import {
   DEFAULT_BRANCH,
@@ -81,24 +87,61 @@ function decodeBase64ToUtf8(b64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
-/** Read data/data_all_prompts.json via Contents API. */
-export async function loadPrompts(
+export type PromptsRemoteResult = {
+  prompts: PromptItem[]
+  sha: string
+  etag: string | null
+  /** True when GitHub returned 304 Not Modified */
+  notModified: boolean
+}
+
+/**
+ * Read data/data_all_prompts.json via Contents API.
+ * Pass etag for conditional fetch (304 → notModified).
+ */
+export async function loadPromptsRemote(
   settings: GithubSettings,
-): Promise<PromptItem[]> {
+  _opts?: { etag?: string | null; force?: boolean },
+): Promise<PromptsRemoteResult> {
   const { owner, name } = requireRepo(settings)
+  // Bust query only — do NOT send If-None-Match (not CORS-safelisted;
+  // api.github.com preflight may reject it). Compare sha client-side instead.
   const bust = `_=${Date.now()}`
   const apiPath = `/repos/${owner}/${name}/contents/${PROMPTS_PATH}?ref=${encodeURIComponent(DEFAULT_BRANCH)}&${bust}`
+
   const res = await githubFetch(settings, apiPath)
 
   if (!res.ok) await parseError(res)
 
+  const etag = res.headers.get('ETag')
   const data = (await res.json()) as GithubFileContent
   if (data.encoding !== 'base64' || typeof data.content !== 'string') {
     throw new GithubApiError(422, '无法解码文件内容')
   }
   const text = decodeBase64ToUtf8(data.content)
   const parsed = JSON.parse(text) as unknown
-  return normalizePrompts(parsed)
+  return {
+    prompts: normalizePrompts(parsed),
+    sha: data.sha,
+    etag,
+    notModified: false,
+  }
+}
+
+/** Persist a successful remote fetch into IndexedDB. */
+export async function savePromptsToCache(
+  settings: GithubSettings,
+  remote: PromptsRemoteResult,
+): Promise<PromptsCacheRecord> {
+  const record: PromptsCacheRecord = {
+    repo: settings.repo.trim(),
+    prompts: remote.prompts,
+    sha: remote.sha,
+    etag: remote.etag,
+    updatedAt: new Date().toISOString(),
+  }
+  await putPromptsCache(record)
+  return record
 }
 
 export async function testConnection(settings: GithubSettings): Promise<string> {
@@ -110,40 +153,44 @@ export async function testConnection(settings: GithubSettings): Promise<string> 
   return `${data.full_name}${data.private ? ' (private)' : ' (public)'}`
 }
 
-/** In-memory blob URL cache for private-repo images. */
+/** In-memory blob URL cache for private-repo images (session). */
 const imageCache = new Map<string, Promise<string | null>>()
 
-function cacheKey(settings: GithubSettings, path: string): string {
+function memKey(settings: GithubSettings, path: string): string {
   return `${settings.repo.trim()}|${path}`
 }
 
 /**
- * Fetch a private-repo image via Contents API raw media type + Authorization.
+ * Fetch a private-repo image via Contents API raw + Authorization.
+ * Checks IndexedDB blob store, then network; writes IDB on miss.
  * Returns an object URL, or null on 404 / failure.
- * Never use naked raw.githubusercontent.com for private repos.
  */
 export function fetchPrivateImage(
   settings: GithubSettings,
   path: string,
 ): Promise<string | null> {
-  const key = cacheKey(settings, path)
+  const key = memKey(settings, path)
   const hit = imageCache.get(key)
   if (hit) return hit
 
   const promise = (async (): Promise<string | null> => {
+    const repo = settings.repo.trim()
     try {
+      const cached = await getImageBlob(repo, path)
+      if (cached && cached.size > 0) {
+        return URL.createObjectURL(cached)
+      }
+
       const { owner, name } = requireRepo(settings)
       const apiPath = `/repos/${owner}/${name}/contents/${encodeURI(path)}?ref=${encodeURIComponent(DEFAULT_BRANCH)}`
       const res = await githubFetch(settings, apiPath, {
         headers: { Accept: 'application/vnd.github.raw' },
       })
       if (res.status === 404) return null
-      if (!res.ok) {
-        // Soft-fail for images — don't spam UI with every missing file
-        return null
-      }
+      if (!res.ok) return null
       const blob = await res.blob()
       if (!blob.size) return null
+      void putImageBlob(repo, path, blob)
       return URL.createObjectURL(blob)
     } catch {
       return null
@@ -154,7 +201,7 @@ export function fetchPrivateImage(
   return promise
 }
 
-/** Drop cached blob URLs (e.g. after clearing settings). */
+/** Drop in-memory blob URLs (e.g. after clearing settings/cache). */
 export function clearImageCache(): void {
   for (const p of imageCache.values()) {
     void p.then((url) => {
