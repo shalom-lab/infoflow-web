@@ -1,3 +1,4 @@
+import type { ReactNode, MouseEvent } from 'react'
 import type { GithubSettings } from '../github/types'
 import { usePromptImages } from '../hooks/usePromptImages'
 
@@ -6,13 +7,22 @@ interface Props {
   settings: GithubSettings | null
   /** When false, skip network fetch (demo / unconfigured). */
   enabled: boolean
+  onClick?: () => void
+  /** Overlay controls (e.g. copy / star), bottom-right. */
+  actions?: ReactNode
 }
 
 /**
- * Card cover: first image with object-fit contain, total count badge.
- * Carousel lives in the detail modal.
+ * Card cover: natural-height image (waterfall-friendly), count badge.
+ * Click opens detail; actions stopPropagation.
  */
-export function PromptCover({ promptId, settings, enabled }: Props) {
+export function PromptCover({
+  promptId,
+  settings,
+  enabled,
+  onClick,
+  actions,
+}: Props) {
   const { rootRef, coverUrl, count, status } = usePromptImages(
     promptId,
     settings,
@@ -20,8 +30,26 @@ export function PromptCover({ promptId, settings, enabled }: Props) {
     { lazy: true },
   )
 
+  const clickable = Boolean(onClick)
+
   return (
-    <div className="prompt-cover" ref={rootRef}>
+    <div
+      className={`prompt-cover${clickable ? ' clickable' : ''}`}
+      ref={rootRef}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick?.()
+              }
+            }
+          : undefined
+      }
+    >
       {status === 'ok' && coverUrl ? (
         <img src={coverUrl} alt="" className="cover-img" loading="lazy" />
       ) : status === 'loading' || status === 'idle' ? (
@@ -39,6 +67,16 @@ export function PromptCover({ promptId, settings, enabled }: Props) {
         <span className="cover-badge" title={`${count} 张效果图`}>
           {count}张
         </span>
+      )}
+
+      {actions && (
+        <div
+          className="cover-actions"
+          onClick={(e: MouseEvent) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {actions}
+        </div>
       )}
     </div>
   )

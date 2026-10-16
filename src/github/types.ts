@@ -16,6 +16,8 @@ export const SUGGESTED_REPO = 'shalom-lab/InfoFlow'
 /** InfoFlow default branch is master (not main). */
 export const DEFAULT_BRANCH = 'master'
 export const PROMPTS_PATH = 'data/data_all_prompts.json'
+/** Side-channel featured map — does NOT alter data_all_prompts.json fields. */
+export const FEATURED_PATH = 'data/prompt_featured.json'
 
 export interface ParsedRepo {
   owner: string
@@ -58,9 +60,13 @@ export function friendlyGithubError(err: unknown): string {
       case 401:
         return '认证失败 (401)：PAT 无效或已过期，请在设置中更新。'
       case 403:
-        return '权限不足 (403)：PAT 需要 Contents: Read，或触发了 API 限流。'
+        return '权限不足 (403)：PAT 需要 Contents 读写权限，或触发了 API 限流。'
       case 404:
         return '未找到 (404)：仓库/分支/路径不存在，或 PAT 无权访问私有仓库。'
+      case 409:
+        return '冲突 (409)：文件已被修改，请稍后重试同步精选。'
+      case 422:
+        return `请求无效 (422)：${msg}`
       default:
         return `GitHub API 错误 (${err.status})：${msg}`
     }

@@ -4,9 +4,15 @@ import {
   putPromptsCache,
   type PromptsCacheRecord,
 } from '../idb/cache'
+import {
+  parseFeaturedFile,
+  toFeaturedFile,
+  type FeaturedMap,
+} from '../types/featured'
 import { normalizePrompts, type PromptItem } from '../types/prompt'
 import {
   DEFAULT_BRANCH,
+  FEATURED_PATH,
   GithubApiError,
   parseRepo,
   PROMPTS_PATH,
@@ -85,6 +91,15 @@ function decodeBase64ToUtf8(b64: string): string {
     bytes[i] = binary.charCodeAt(i)
   }
   return new TextDecoder().decode(bytes)
+}
+
+function encodeUtf8ToBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!)
+  }
+  return btoa(binary)
 }
 
 export type PromptsRemoteResult = {
@@ -221,4 +236,64 @@ export async function loadDemoPrompts(): Promise<PromptItem[]> {
   }
   const data = (await res.json()) as unknown
   return normalizePrompts(data)
+}
+
+export type FeaturedRemoteResult = {
+  map: FeaturedMap
+  sha: string | null
+}
+
+/** Load data/prompt_featured.json; missing file → empty map. */
+export async function loadFeaturedRemote(
+  settings: GithubSettings,
+): Promise<FeaturedRemoteResult> {
+  const { owner, name } = requireRepo(settings)
+  const bust = `_=${Date.now()}`
+  const apiPath = `/repos/${owner}/${name}/contents/${FEATURED_PATH}?ref=${encodeURIComponent(DEFAULT_BRANCH)}&${bust}`
+  const res = await githubFetch(settings, apiPath)
+  if (res.status === 404) {
+    return { map: {}, sha: null }
+  }
+  if (!res.ok) await parseError(res)
+  const data = (await res.json()) as GithubFileContent
+  if (data.encoding !== 'base64' || typeof data.content !== 'string') {
+    throw new GithubApiError(422, '无法解码精选文件')
+  }
+  const text = decodeBase64ToUtf8(data.content)
+  let parsed: unknown = {}
+  try {
+    parsed = JSON.parse(text) as unknown
+  } catch {
+    parsed = {}
+  }
+  return { map: parseFeaturedFile(parsed), sha: data.sha }
+}
+
+/**
+ * Write featured side-channel JSON (RMW with sha).
+ * Creates the file when sha is null.
+ */
+export async function saveFeaturedRemote(
+  settings: GithubSettings,
+  map: FeaturedMap,
+  sha: string | null,
+): Promise<{ sha: string }> {
+  const { owner, name } = requireRepo(settings)
+  const apiPath = `/repos/${owner}/${name}/contents/${FEATURED_PATH}`
+  const bodyObj = toFeaturedFile(map)
+  const contentText = `${JSON.stringify(bodyObj, null, 2)}\n`
+  const body: Record<string, string> = {
+    message: 'chore: update prompt featured map',
+    content: encodeUtf8ToBase64(contentText),
+    branch: DEFAULT_BRANCH,
+  }
+  if (sha) body.sha = sha
+
+  const res = await githubFetch(settings, apiPath, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) await parseError(res)
+  const data = (await res.json()) as { content: { sha: string } }
+  return { sha: data.content.sha }
 }

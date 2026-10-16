@@ -67,6 +67,13 @@ npm run preview
 
 数据文件（非 BYOK 键，应用内默认）：分支 `master`、路径 `data/data_all_prompts.json`。
 
+## 精选（featured）旁路
+
+- 远程文件：`data/prompt_featured.json`（与 `data_all_prompts.json` 同仓，**不改**原 prompts 字段）
+- 形状：`{ "featured": { "<prompt_id>": true } }`
+- 切星标：先写 IndexedDB → 防抖后批量 Contents API 写回；无写权限时本地仍可标并提示
+- localStorage BYOK 不变：`gh-infoflow-repo` / `gh-infoflow-token`
+
 ## 本地缓存（IndexedDB）
 
 - 库名：`infoflow-web`

@@ -54,6 +54,9 @@ export function SettingsPage({ settings, onSaved }: Props) {
       if (stats.imageCount > 0) {
         parts.push(`效果图 blob ${stats.imageCount} 张`)
       }
+      if (stats.featuredCount > 0) {
+        parts.push(`精选 ${stats.featuredCount}`)
+      }
       setCacheInfo(parts.join(' · '))
     } catch {
       setCacheInfo('无法读取缓存状态')
@@ -236,10 +239,10 @@ export function SettingsPage({ settings, onSaved }: Props) {
       <section className="settings-card" style={{ marginTop: '1.15rem' }}>
         <h2>本地缓存（IndexedDB）</h2>
         <p className="hint">
-          提示词列表与效果图 blob 缓存在浏览器 IndexedDB（库名{' '}
-          <code>infoflow-web</code>
-          ）。启动时先展示缓存，再后台对比 GitHub（ETag / sha），有变化才更新。
-          PAT 不写入 IndexedDB。
+          提示词列表、效果图 blob 与精选旁路（
+          <code>data/prompt_featured.json</code>
+          ）缓存在 IndexedDB（库名 <code>infoflow-web</code>
+          ）。启动先展示缓存再后台同步。PAT 不写入 IndexedDB。
         </p>
         <p className="hint muted">
           当前状态：<strong>{cacheInfo}</strong>
