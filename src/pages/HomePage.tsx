@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { KeywordFilter } from '../components/KeywordFilter'
 import { PromptCard } from '../components/PromptCard'
+import { PromptDetailModal } from '../components/PromptDetailModal'
 import { SearchBar } from '../components/SearchBar'
 import { loadDemoPrompts, loadPrompts } from '../github/client'
 import { isConfigured } from '../github/storage'
@@ -32,6 +33,7 @@ export function HomePage({ settings }: Props) {
   const [demoMode, setDemoMode] = useState(false)
   const [query, setQuery] = useState('')
   const [keyword, setKeyword] = useState<string | null>(null)
+  const [detailPrompt, setDetailPrompt] = useState<PromptItem | null>(null)
 
   const configured = isConfigured(settings)
 
@@ -180,9 +182,19 @@ export function HomePage({ settings }: Props) {
                 setKeyword((cur) => (cur === kw ? null : kw))
               }
               activeKeyword={keyword}
+              onOpenDetail={setDetailPrompt}
             />
           ))}
         </div>
+      )}
+
+      {detailPrompt && (
+        <PromptDetailModal
+          prompt={detailPrompt}
+          settings={configured ? settings : null}
+          imagesEnabled={configured && !demoMode}
+          onClose={() => setDetailPrompt(null)}
+        />
       )}
     </div>
   )

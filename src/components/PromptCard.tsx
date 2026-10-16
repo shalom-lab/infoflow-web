@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { GithubSettings } from '../github/types'
 import type { PromptItem } from '../types/prompt'
 import { PromptCover } from './PromptCover'
@@ -10,27 +9,7 @@ interface Props {
   imagesEnabled: boolean
   onKeywordClick: (kw: string) => void
   activeKeyword?: string | null
-}
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.position = 'fixed'
-      ta.style.left = '-9999px'
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand('copy')
-      document.body.removeChild(ta)
-      return ok
-    } catch {
-      return false
-    }
-  }
+  onOpenDetail: (prompt: PromptItem) => void
 }
 
 export function PromptCard({
@@ -39,26 +18,12 @@ export function PromptCard({
   imagesEnabled,
   onKeywordClick,
   activeKeyword,
+  onOpenDetail,
 }: Props) {
-  const [expanded, setExpanded] = useState(false)
-  const [copied, setCopied] = useState(false)
-
   const title = prompt.wechat_title || prompt.reply_keyword || '(无标题)'
-  const preview =
-    prompt.content.length > 160
-      ? `${prompt.content.slice(0, 160)}…`
-      : prompt.content
-
-  const handleCopy = async () => {
-    const ok = await copyText(prompt.content)
-    if (ok) {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    }
-  }
 
   return (
-    <article className={`prompt-card${expanded ? ' expanded' : ''}`}>
+    <article className="prompt-card">
       <PromptCover
         promptId={prompt.prompt_id}
         settings={settings}
@@ -86,26 +51,13 @@ export function PromptCard({
           </div>
         )}
 
-        <div className="card-prompt">
-          <pre className="prompt-text">
-            {expanded ? prompt.content : preview}
-          </pre>
-        </div>
-
         <div className="card-footer">
           <button
             type="button"
-            className="btn ghost sm"
-            onClick={() => setExpanded((v) => !v)}
+            className="btn primary card-detail-btn"
+            onClick={() => onOpenDetail(prompt)}
           >
-            {expanded ? '收起' : '展开全文'}
-          </button>
-          <button
-            type="button"
-            className="btn primary sm"
-            onClick={() => void handleCopy()}
-          >
-            {copied ? '已复制' : '复制提示词'}
+            查看详情
           </button>
         </div>
       </div>

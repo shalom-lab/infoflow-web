@@ -58,7 +58,8 @@ npm run preview
 
 ## 功能
 
-- **响应式卡片网格**：封面效果图（多图可轮播 / 张数角标）、`wechat_title`、keywords 胶囊、可展开与一键复制的完整 `content`
+- **响应式卡片网格**：大图为主（`object-fit: contain`）、右上角张数角标、`wechat_title`、keywords 胶囊、大按钮「查看详情」
+- **详情 Modal**：宽屏左右布局（左图可切换 / 右 prompt 原文可滚动 + 复制提示词）；窄屏上下堆叠
 - **搜索**：标题 / 关键词 / 提示词正文；顶部热门关键词筛选
 - **无图占位**：约定路径 `infoflow-data/Images/Prompt/{prompt_id}-N.png`（从 0 起），404 时优雅占位；IntersectionObserver 懒加载，避免对 396 条串行打爆 API
 - **私有图**：浏览器直连 `api.github.com` Contents raw（`Accept: application/vnd.github.raw` + Bearer token），转 blob URL 显示；**不用**裸 `raw.githubusercontent.com`
