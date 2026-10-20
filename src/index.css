@@ -908,11 +908,9 @@ strong {
   box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
-.icf-thumb-min {
-  z-index: 2;
-}
+.icf-thumb-min,
 .icf-thumb-max {
-  z-index: 3;
+  /* z-index set inline so overlapping thumbs can swap stacking */
 }
 .icf-thumb:focus-visible::-webkit-slider-thumb {
   box-shadow: 0 0 0 3px var(--accent-glow);
@@ -1416,7 +1414,7 @@ strong {
   flex-shrink: 0;
 }
 
-/* 张数：5 格信号条 + 极小数字；未亮灰、点亮站点紫 */
+/* 张数：4 格信号条 + 极小数字；未亮灰、点亮站点紫 */
 .card-count {
   flex-shrink: 0;
   display: inline-flex;

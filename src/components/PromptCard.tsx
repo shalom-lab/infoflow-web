@@ -18,7 +18,7 @@ interface Props {
   onToggleSelect?: (prompt: PromptItem) => void
 }
 
-const BAR_INDEXES = [1, 2, 3, 4, 5] as const
+const BAR_INDEXES = [1, 2, 3, 4] as const
 
 export function PromptCard({
   prompt,
