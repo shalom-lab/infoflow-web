@@ -750,8 +750,10 @@ strong {
 .icf-controls {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  max-width: 9.5rem;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .icf-val {
   flex-shrink: 0;
@@ -891,44 +893,82 @@ strong {
   scrollbar-width: thin;
 }
 
-/* Left sidebar: 精选 → 张数 → 年月（统一栏目标题 + 缩进控件） */
+/* Left sidebar: 精选 → 张数 → 年月（caption + control，Settings/Linear 式） */
 .home-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0;
   align-self: stretch;
   height: 100%;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 0.1rem 0 0.2rem;
+  padding: 0;
+  /* Shared left edge for switch / slider / month pills */
+  --sidebar-gutter: 0;
 }
 
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.28rem;
+  min-width: 0;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.sidebar-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0.2rem;
+}
+.sidebar-section:first-child {
+  padding-top: 0.15rem;
+}
+
+/* 精选：标题左、开关右，同一行 */
+.sidebar-section--inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.55rem;
+}
+.sidebar-section--inline .sidebar-section-title {
+  margin: 0;
+  flex: 1;
   min-width: 0;
 }
+.sidebar-section--inline .featured-switch {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .sidebar-section-title {
-  font-size: 0.72rem;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-faint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   line-height: 1.2;
-  padding: 0 0.15rem;
+  padding: 0;
   text-align: left;
 }
 .sidebar-section-body {
-  padding-left: 0.55rem;
+  padding-left: var(--sidebar-gutter);
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* 张数：数字+轨道铺满侧栏宽度，不漂在空白里 */
 .home-sidebar > .sidebar-section.image-count-filter .icf-controls {
-  max-width: 8.5rem;
+  max-width: none;
+  width: 100%;
+  gap: 0.35rem;
 }
 .home-sidebar .image-count-filter .icf-val {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
+  min-width: 1rem;
+  color: var(--text-muted);
 }
 .home-sidebar .image-count-filter .icf-slider {
   flex: 1 1 auto;
@@ -945,11 +985,11 @@ strong {
 .month-filter-list {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.06rem;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 0 0.15rem 0.35rem 0;
+  padding: 0 0 0.25rem;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
@@ -959,12 +999,14 @@ strong {
   background: transparent;
   color: var(--text-muted);
   border-radius: var(--radius-pill);
-  padding: 0.26rem 0.55rem;
+  padding: 0.18rem 0.5rem;
   font: inherit;
   font-size: 0.72rem;
+  line-height: 1.25;
   cursor: pointer;
   text-align: left;
   width: 100%;
+  box-sizing: border-box;
   white-space: nowrap;
   transition:
     background 0.15s var(--ease),
@@ -990,31 +1032,41 @@ strong {
   }
   .home-sidebar {
     display: grid;
-    grid-template-columns: auto minmax(0, 11rem) 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-items: start;
-    column-gap: 0.7rem;
-    row-gap: 0.45rem;
+    column-gap: 0.85rem;
+    row-gap: 0;
     height: auto;
     overflow: visible;
     padding: 0;
     gap: 0;
   }
-  .home-sidebar > .sidebar-section:first-child {
+  .home-sidebar > .sidebar-section:first-child,
+  .home-sidebar > .sidebar-section.sidebar-section--inline {
     grid-column: 1;
     grid-row: 1;
+    border-bottom: none;
+    padding: 0.25rem 0;
+    align-self: center;
   }
   .home-sidebar > .sidebar-section.image-count-filter {
     grid-column: 2;
     grid-row: 1;
     width: 100%;
-    max-width: 11rem;
+    max-width: none;
+    border-bottom: none;
+    padding: 0.25rem 0;
   }
   .home-sidebar > .sidebar-section.month-filter {
     grid-column: 1 / -1;
     grid-row: 2;
     flex: none;
     overflow: visible;
+    border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    border-bottom: none;
+    padding-top: 0.45rem;
+    padding-bottom: 0;
   }
   .month-filter-list {
     flex-direction: row;
@@ -1023,13 +1075,13 @@ strong {
     overflow-x: auto;
     overflow-y: hidden;
     padding: 0 0 0.1rem;
-    gap: 0.3rem;
+    gap: 0.22rem;
   }
   .month-chip {
     width: auto;
     flex-shrink: 0;
     text-align: center;
-    padding: 0.18rem 0.55rem;
+    padding: 0.16rem 0.5rem;
   }
 }
 
