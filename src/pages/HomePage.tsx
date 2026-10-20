@@ -387,14 +387,14 @@ export function HomePage({ settings }: Props) {
           {!filtersOpen && (
             <button
               type="button"
-              className={`btn sm home-filters-toggle${onlyFeatured || replyKeywords.length > 0 ? '' : ' ghost'}`}
+              className={`btn sm home-filters-toggle${replyKeywords.length > 0 ? '' : ' ghost'}`}
               onClick={() => setFiltersOpen(true)}
               aria-expanded={false}
               aria-controls="home-filters-panel"
-              title="展开筛选（精选 / 张数 / 口令）"
+              title="展开筛选（口令）"
             >
               筛选
-              {(onlyFeatured || replyKeywords.length > 0) && (
+              {replyKeywords.length > 0 && (
                 <span className="filters-active-dot" aria-hidden />
               )}
               <span className="home-filters-chevron" aria-hidden>
@@ -407,28 +407,6 @@ export function HomePage({ settings }: Props) {
         {filtersOpen && (
           <div className="home-filters is-open" id="home-filters-panel">
             <div className="home-filters-row" id="home-filters-body">
-              <label
-                className={`featured-check${onlyFeatured ? ' is-on' : ''}`}
-                title="只看精选提示词"
-              >
-                <input
-                  type="checkbox"
-                  checked={onlyFeatured}
-                  onChange={(e) => setOnlyFeatured(e.target.checked)}
-                  aria-label="只看精选"
-                />
-                <span>精选</span>
-              </label>
-              <ImageCountFilter
-                boundMin={imageCountBoundMin}
-                boundMax={imageCountBoundMax}
-                valueMin={countMin}
-                valueMax={effectiveCountMax}
-                onChange={(lo, hi) => {
-                  setCountMin(Math.max(1, lo))
-                  setCountMax(hi)
-                }}
-              />
               <button
                 type="button"
                 className="btn sm ghost home-filters-toggle"
@@ -453,11 +431,35 @@ export function HomePage({ settings }: Props) {
       </div>
 
       <div className="home-body">
-        <MonthFilter
-          months={availableMonths}
-          selected={selectedMonth}
-          onSelect={setSelectedMonth}
-        />
+        <aside className="home-sidebar" aria-label="侧栏筛选">
+          <label
+            className={`featured-check${onlyFeatured ? ' is-on' : ''}`}
+            title="只看精选提示词"
+          >
+            <input
+              type="checkbox"
+              checked={onlyFeatured}
+              onChange={(e) => setOnlyFeatured(e.target.checked)}
+              aria-label="只看精选"
+            />
+            <span>精选</span>
+          </label>
+          <ImageCountFilter
+            boundMin={imageCountBoundMin}
+            boundMax={imageCountBoundMax}
+            valueMin={countMin}
+            valueMax={effectiveCountMax}
+            onChange={(lo, hi) => {
+              setCountMin(Math.max(1, lo))
+              setCountMax(hi)
+            }}
+          />
+          <MonthFilter
+            months={availableMonths}
+            selected={selectedMonth}
+            onSelect={setSelectedMonth}
+          />
+        </aside>
         <div className="home-main">
       {!configured && (
         <div className="banner warn setup-banner compact-banner">

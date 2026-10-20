@@ -244,7 +244,7 @@ strong {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Collapsible filter block: 精选 + 张数 + 口令 */
+/* Collapsible filter block: 口令胶囊（精选/张数在侧栏） */
 .home-filters {
   display: flex;
   flex-direction: column;
@@ -258,14 +258,9 @@ strong {
 .home-filters-row {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.55rem;
-  min-height: 1.75rem;
-}
-.home-filters-row .image-count-filter {
-  flex: 1;
-  min-width: 0;
-  max-width: none;
-  padding: 0;
+  min-height: 1.5rem;
 }
 .featured-check {
   display: inline-flex;
@@ -749,13 +744,15 @@ strong {
 }
 
 
-/* Image-count dual range */
+/* Image-count dual range (compact; sidebar-width, not full main) */
 .image-count-filter {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  max-width: 28rem;
+  gap: 0.35rem;
+  max-width: 100%;
+  width: 100%;
   padding: 0.1rem 0.15rem;
+  box-sizing: border-box;
 }
 .icf-label {
   flex-shrink: 0;
@@ -766,7 +763,7 @@ strong {
 }
 .icf-val {
   flex-shrink: 0;
-  min-width: 1.1rem;
+  min-width: 0.9rem;
   text-align: center;
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
@@ -775,6 +772,7 @@ strong {
 .icf-slider {
   position: relative;
   flex: 1;
+  min-width: 0;
   height: 1.35rem;
   display: flex;
   align-items: center;
@@ -849,12 +847,6 @@ strong {
 .icf-thumb:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
-@media (max-width: 720px) {
-  .image-count-filter {
-    max-width: none;
-  }
-}
-
 /* Keyword filter */
 .keyword-filter {
   display: flex;
@@ -889,12 +881,12 @@ strong {
   font-weight: 560;
 }
 
-/* Home body: scroll region below top bar (left month + right cards) */
+/* Home body: scroll region below top bar (left sidebar + right cards) */
 .home-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 7.25rem minmax(0, 1fr);
+  grid-template-columns: 8rem minmax(0, 1fr);
   gap: 0.55rem 0.75rem;
   align-items: stretch;
   overflow: hidden;
@@ -907,14 +899,64 @@ strong {
   scrollbar-width: thin;
 }
 
+/* Left sidebar: 精选 → 张数 → 年月 */
+.home-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.05rem 0 0.2rem;
+}
+.home-sidebar > .featured-check {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.75rem;
+}
+/* 张数：侧栏内短滑条（标签+区间一行，滑条第二行） */
+.home-sidebar > .image-count-filter {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    'label lo hi'
+    'slider slider slider';
+  column-gap: 0.25rem;
+  row-gap: 0.15rem;
+  align-items: center;
+  max-width: 100%;
+  width: 100%;
+  padding: 0.05rem 0.35rem 0.15rem;
+}
+.home-sidebar .image-count-filter .icf-label {
+  grid-area: label;
+}
+.home-sidebar .image-count-filter .icf-val {
+  min-width: 0.85rem;
+  font-size: 0.68rem;
+}
+.home-sidebar .image-count-filter > .icf-val:first-of-type {
+  grid-area: lo;
+  justify-self: end;
+}
+.home-sidebar .image-count-filter > .icf-val:last-of-type {
+  grid-area: hi;
+  justify-self: start;
+}
+.home-sidebar .image-count-filter .icf-slider {
+  grid-area: slider;
+  width: 100%;
+  flex: none;
+  min-width: 0;
+}
+
 .month-filter {
   display: flex;
   flex-direction: column;
   gap: 0.12rem;
   position: relative;
-  align-self: stretch;
-  max-height: none;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -965,8 +1007,37 @@ strong {
     grid-template-rows: auto minmax(0, 1fr);
     gap: 0.45rem;
   }
+  .home-sidebar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 11rem) 1fr;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 0.55rem;
+    row-gap: 0.3rem;
+    height: auto;
+    overflow: visible;
+    padding: 0;
+  }
+  .home-sidebar > .featured-check {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0.1rem 0;
+  }
+  /* 短张数，勿拉满整行 */
+  .home-sidebar > .image-count-filter {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    max-width: 11rem;
+    padding: 0.05rem 0;
+  }
+  .home-sidebar > .month-filter {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
   .month-filter {
     position: relative;
+    flex: none;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
@@ -974,7 +1045,7 @@ strong {
     max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 0.1rem 0 0.35rem;
+    padding: 0.1rem 0 0.2rem;
     gap: 0.3rem;
   }
   .month-filter-label {

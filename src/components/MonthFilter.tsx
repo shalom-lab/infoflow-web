@@ -17,7 +17,7 @@ export function MonthFilter({ months, selected, onSelect }: Props) {
   if (months.length === 0) return null
 
   return (
-    <aside className="month-filter" aria-label="年月筛选">
+    <div className="month-filter" aria-label="年月筛选">
       <div className="month-filter-label">年月</div>
       <button
         type="button"
@@ -36,6 +36,6 @@ export function MonthFilter({ months, selected, onSelect }: Props) {
           {formatMonthLabel(ym)}
         </button>
       ))}
-    </aside>
+    </div>
   )
 }
