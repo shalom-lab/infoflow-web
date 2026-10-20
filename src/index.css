@@ -248,14 +248,76 @@ strong {
 .home-filters {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.45rem;
   margin-bottom: 0.15rem;
+  padding: 0.45rem 0.6rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
 }
-.home-filters-bar {
+.home-filters-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   min-height: 1.75rem;
+}
+.home-filters-row .image-count-filter {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+}
+.featured-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.featured-check input {
+  appearance: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: grid;
+  place-content: center;
+  transition:
+    background 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.featured-check input::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  transform: scale(0);
+  transition: transform 0.12s var(--ease);
+  box-shadow: inset 1em 1em #fff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+}
+.featured-check input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.featured-check input:checked::before {
+  transform: scale(1);
+}
+.featured-check input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.featured-check.is-on {
+  color: var(--accent);
 }
 .home-filters-toggle {
   margin-left: auto;
@@ -263,6 +325,7 @@ strong {
   font-size: 0.78rem;
   padding: 0.28rem 0.55rem;
   gap: 0.25rem;
+  flex-shrink: 0;
 }
 .home-filters-toggle:hover {
   color: var(--text);
@@ -272,11 +335,8 @@ strong {
   line-height: 1;
   opacity: 0.75;
 }
-.home-filters-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.15rem 0 0.1rem;
+.home-filters .keyword-filter {
+  padding-top: 0.1rem;
 }
 .search-toolbar {
   display: flex;

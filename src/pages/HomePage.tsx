@@ -406,16 +406,29 @@ export function HomePage({ settings }: Props) {
 
         {filtersOpen && (
           <div className="home-filters is-open" id="home-filters-panel">
-            <div className="home-filters-bar">
-              <button
-                type="button"
-                className={`btn sm filter-toggle${onlyFeatured ? ' primary' : ''}`}
-                onClick={() => setOnlyFeatured((v) => !v)}
-                aria-pressed={onlyFeatured}
+            <div className="home-filters-row" id="home-filters-body">
+              <label
+                className={`featured-check${onlyFeatured ? ' is-on' : ''}`}
                 title="只看精选提示词"
               >
-                ★ 精选
-              </button>
+                <input
+                  type="checkbox"
+                  checked={onlyFeatured}
+                  onChange={(e) => setOnlyFeatured(e.target.checked)}
+                  aria-label="只看精选"
+                />
+                <span>精选</span>
+              </label>
+              <ImageCountFilter
+                boundMin={imageCountBoundMin}
+                boundMax={imageCountBoundMax}
+                valueMin={countMin}
+                valueMax={effectiveCountMax}
+                onChange={(lo, hi) => {
+                  setCountMin(Math.max(1, lo))
+                  setCountMax(hi)
+                }}
+              />
               <button
                 type="button"
                 className="btn sm ghost home-filters-toggle"
@@ -429,24 +442,12 @@ export function HomePage({ settings }: Props) {
                 </span>
               </button>
             </div>
-            <div className="home-filters-body" id="home-filters-body">
-              <ImageCountFilter
-                boundMin={imageCountBoundMin}
-                boundMax={imageCountBoundMax}
-                valueMin={countMin}
-                valueMax={effectiveCountMax}
-                onChange={(lo, hi) => {
-                  setCountMin(Math.max(1, lo))
-                  setCountMax(hi)
-                }}
-              />
-              <KeywordFilter
-                keywords={topReplyKeywords}
-                selected={replyKeywords}
-                onToggle={toggleReplyKeyword}
-                onClear={() => setReplyKeywords([])}
-              />
-            </div>
+            <KeywordFilter
+              keywords={topReplyKeywords}
+              selected={replyKeywords}
+              onToggle={toggleReplyKeyword}
+              onClear={() => setReplyKeywords([])}
+            />
           </div>
         )}
       </div>
