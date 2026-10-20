@@ -47,6 +47,8 @@ export function PromptCard({
     <article className={`prompt-card${featured ? ' is-featured' : ''}`}>
       <PromptCover
         promptId={prompt.prompt_id}
+        image={prompt.image}
+        images={prompt.images}
         settings={settings}
         enabled={imagesEnabled}
         onClick={() => onOpenDetail(prompt)}

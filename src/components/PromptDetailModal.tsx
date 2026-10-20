@@ -22,7 +22,7 @@ export function PromptDetailModal({
     prompt.prompt_id,
     settings,
     imagesEnabled,
-    { lazy: false },
+    { lazy: false, image: prompt.image, images: prompt.images },
   )
   const [index, setIndex] = useState(0)
   const [copied, setCopied] = useState(false)

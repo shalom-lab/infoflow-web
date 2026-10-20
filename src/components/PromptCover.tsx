@@ -7,6 +7,10 @@ interface Props {
   settings: GithubSettings | null
   /** When false, skip network fetch (demo / unconfigured). */
   enabled: boolean
+  /** Cover path from record. */
+  image?: string
+  /** Gallery paths from record. */
+  images?: string[]
   onClick?: () => void
   /** Overlay controls (e.g. copy / star), bottom-right. */
   actions?: ReactNode
@@ -20,6 +24,8 @@ export function PromptCover({
   promptId,
   settings,
   enabled,
+  image,
+  images,
   onClick,
   actions,
 }: Props) {
@@ -28,7 +34,7 @@ export function PromptCover({
     settings,
     enabled,
     // Cards only need cover (+ few probes for badge); modal loads the rest.
-    { lazy: true, max: 3 },
+    { lazy: true, max: 3, image, images },
   )
 
   const clickable = Boolean(onClick)
