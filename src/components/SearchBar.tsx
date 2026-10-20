@@ -8,7 +8,7 @@ interface Props {
 export function SearchBar({ value, onChange, count, total }: Props) {
   return (
     <div className="search-container" role="search">
-      <div className="search-input-wrap">
+      <div className={`search-input-wrap${value ? ' has-clear' : ''}`}>
         <span className="search-icon" aria-hidden>
           ⌕
         </span>
@@ -31,10 +31,10 @@ export function SearchBar({ value, onChange, count, total }: Props) {
             ×
           </button>
         )}
+        <span className="result-count" aria-live="polite">
+          {count === total ? `${total} 条` : `${count} / ${total}`}
+        </span>
       </div>
-      <span className="result-count" aria-live="polite">
-        {count === total ? `${total} 条` : `${count} / ${total}`}
-      </span>
     </div>
   )
 }

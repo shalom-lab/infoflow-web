@@ -376,12 +376,38 @@ export function HomePage({ settings }: Props) {
             <div className="brand-mark" aria-hidden>
               IF
             </div>
-            <div>
+            <div className="brand-text">
               <h1 className="brand-title">InfoFlow</h1>
               <p className="brand-sub">效果图 · 提示词卡片</p>
             </div>
           </div>
+          <div className="header-search">
+            <SearchBar
+              value={query}
+              onChange={setQuery}
+              count={sorted.length}
+              total={prompts.length}
+            />
+          </div>
           <div className="header-actions">
+            {!filtersOpen && (
+              <button
+                type="button"
+                className={`btn sm home-filters-toggle${replyKeywords.length > 0 ? '' : ' ghost'}`}
+                onClick={() => setFiltersOpen(true)}
+                aria-expanded={false}
+                aria-controls="home-filters-panel"
+                title="展开筛选（口令）"
+              >
+                筛选
+                {replyKeywords.length > 0 && (
+                  <span className="filters-active-dot" aria-hidden />
+                )}
+                <span className="home-filters-chevron" aria-hidden>
+                  ▾
+                </span>
+              </button>
+            )}
             <button
               type="button"
               className={`btn sm filter-toggle${selectMode ? ' primary' : ''}`}
@@ -416,33 +442,6 @@ export function HomePage({ settings }: Props) {
             </Link>
           </div>
         </header>
-
-        <div className="toolbar search-toolbar">
-          <SearchBar
-            value={query}
-            onChange={setQuery}
-            count={sorted.length}
-            total={prompts.length}
-          />
-          {!filtersOpen && (
-            <button
-              type="button"
-              className={`btn sm home-filters-toggle${replyKeywords.length > 0 ? '' : ' ghost'}`}
-              onClick={() => setFiltersOpen(true)}
-              aria-expanded={false}
-              aria-controls="home-filters-panel"
-              title="展开筛选（口令）"
-            >
-              筛选
-              {replyKeywords.length > 0 && (
-                <span className="filters-active-dot" aria-hidden />
-              )}
-              <span className="home-filters-chevron" aria-hidden>
-                ▾
-              </span>
-            </button>
-          )}
-        </div>
 
         {filtersOpen && (
           <div className="home-filters is-open" id="home-filters-panel">
