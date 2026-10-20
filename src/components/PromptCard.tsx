@@ -10,7 +10,7 @@ interface Props {
   settings: GithubSettings | null
   imagesEnabled: boolean
   featured: boolean
-  onKeywordClick: (kw: string) => void
+  onKeywordClick?: (kw: string) => void
   activeKeyword?: string | null
   onOpenDetail: (prompt: PromptItem) => void
   onToggleFeatured: (promptId: string) => void
@@ -145,11 +145,15 @@ export function PromptCard({
                 key={kw}
                 label={kw}
                 active={activeKeyword === kw}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (selectMode) return
-                  onKeywordClick(kw)
-                }}
+                onClick={
+                  onKeywordClick
+                    ? (e) => {
+                        e.stopPropagation()
+                        if (selectMode) return
+                        onKeywordClick(kw)
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>

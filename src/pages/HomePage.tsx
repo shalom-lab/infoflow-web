@@ -49,9 +49,9 @@ export function HomePage({ settings }: Props) {
   const [loading, setLoading] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [query, setQuery] = useState('')
-  const [keyword, setKeyword] = useState<string | null>(null)
+  const [replyKeywords, setReplyKeywords] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
-  const [countMin, setCountMin] = useState(0)
+  const [countMin, setCountMin] = useState(1)
   /** null = use full data range (avoids filtering before bounds sync). */
   const [countMax, setCountMax] = useState<number | null>(null)
   const [onlyFeatured, setOnlyFeatured] = useState(false)
@@ -184,19 +184,6 @@ export function HomePage({ settings }: Props) {
     })
   }, [refresh, forceFlag, searchParams, setSearchParams])
 
-  const topKeywords = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const p of prompts) {
-      for (const kw of p.keywords) {
-        counts.set(kw, (counts.get(kw) ?? 0) + 1)
-      }
-    }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh'))
-      .slice(0, 24)
-      .map(([k]) => k)
-  }, [prompts])
-
   const availableMonths = useMemo(() => {
     const set = new Set<string>()
     for (const p of prompts) {
@@ -205,6 +192,8 @@ export function HomePage({ settings }: Props) {
     }
     return [...set].sort((a, b) => b.localeCompare(a))
   }, [prompts])
+
+  const imageCountBoundMin = 1
 
   const imageCountBoundMax = useMemo(() => {
     let hi = 0
@@ -215,31 +204,61 @@ export function HomePage({ settings }: Props) {
   }, [prompts])
 
   useEffect(() => {
-    setCountMin(0)
+    setCountMin(imageCountBoundMin)
     setCountMax(null)
   }, [imageCountBoundMax])
 
   const effectiveCountMax = countMax ?? imageCountBoundMax
+  const countFilterActive = imageCountBoundMax >= imageCountBoundMin
 
-  const filtered = useMemo(() => {
+  /** Other filters first; reply_keyword facets come from this subset. */
+  const baseFiltered = useMemo(() => {
     return prompts.filter((p) => {
       if (onlyFeatured && !isFeatured(p.prompt_id)) return false
       if (selectedMonth && promptMonth(p) !== selectedMonth) return false
-      if (keyword && !p.keywords.includes(keyword)) return false
-      const n = promptImageCount(p)
-      if (n < countMin || n > effectiveCountMax) return false
+      if (countFilterActive) {
+        const n = promptImageCount(p)
+        if (n < countMin || n > effectiveCountMax) return false
+      }
       return matchesQuery(p, query)
     })
   }, [
     prompts,
     query,
-    keyword,
     selectedMonth,
     countMin,
     effectiveCountMax,
+    countFilterActive,
     onlyFeatured,
     isFeatured,
   ])
+
+  const topReplyKeywords = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const p of baseFiltered) {
+      const rk = p.reply_keyword?.trim()
+      if (!rk) continue
+      counts.set(rk, (counts.get(rk) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh'))
+      .map(([k]) => k)
+  }, [baseFiltered])
+
+  const filtered = useMemo(() => {
+    if (replyKeywords.length === 0) return baseFiltered
+    const want = new Set(replyKeywords)
+    return baseFiltered.filter((p) => {
+      const rk = p.reply_keyword?.trim()
+      return Boolean(rk && want.has(rk))
+    })
+  }, [baseFiltered, replyKeywords])
+
+  const toggleReplyKeyword = useCallback((kw: string) => {
+    setReplyKeywords((prev) =>
+      prev.includes(kw) ? prev.filter((k) => k !== kw) : [...prev, kw],
+    )
+  }, [])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -315,7 +334,7 @@ export function HomePage({ settings }: Props) {
             total={prompts.length}
           />
           <ImageCountFilter
-            boundMin={0}
+            boundMin={imageCountBoundMin}
             boundMax={imageCountBoundMax}
             valueMin={countMin}
             valueMax={effectiveCountMax}
@@ -327,9 +346,10 @@ export function HomePage({ settings }: Props) {
         </div>
 
         <KeywordFilter
-          keywords={topKeywords}
-          selected={keyword}
-          onSelect={setKeyword}
+          keywords={topReplyKeywords}
+          selected={replyKeywords}
+          onToggle={toggleReplyKeyword}
+          onClear={() => setReplyKeywords([])}
         />
       </div>
 
@@ -374,10 +394,6 @@ export function HomePage({ settings }: Props) {
               settings={configured ? settings : null}
               imagesEnabled={configured && !demoMode}
               featured={isFeatured(p.prompt_id)}
-              onKeywordClick={(kw) =>
-                setKeyword((cur) => (cur === kw ? null : kw))
-              }
-              activeKeyword={keyword}
               onOpenDetail={setDetailPrompt}
               onToggleFeatured={toggleFeatured}
               selectMode={selectMode}

@@ -1,5 +1,5 @@
 interface Props {
-  /** Data-driven lower bound (usually 0). */
+  /** Data-driven lower bound (at least 1). */
   boundMin: number
   /** Data-driven upper bound (max image_count in dataset). */
   boundMax: number
@@ -10,7 +10,7 @@ interface Props {
 
 /**
  * Dual-thumb range slider for filtering by effect-image count.
- * Hidden when boundMax is 0 (no images in the dataset).
+ * Hidden when boundMax <= boundMin (e.g. no images >= min in the dataset).
  */
 export function ImageCountFilter({
   boundMin,
