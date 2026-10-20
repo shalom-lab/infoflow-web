@@ -337,7 +337,7 @@ export function HomePage({ settings }: Props) {
               IF
             </div>
             <div>
-              <h1 className="brand-title">InfoFlow Prompt</h1>
+              <h1 className="brand-title">InfoFlow</h1>
               <p className="brand-sub">效果图 · 提示词卡片</p>
             </div>
           </div>
@@ -433,15 +433,17 @@ export function HomePage({ settings }: Props) {
       <div className="home-body">
         <aside className="home-sidebar" aria-label="侧栏筛选">
           <label
-            className={`featured-check${onlyFeatured ? ' is-on' : ''}`}
-            title="只看精选提示词"
+            className={`featured-switch${onlyFeatured ? ' is-on' : ''}`}
+            title="开：只看精选；关：全部"
           >
             <input
               type="checkbox"
+              role="switch"
               checked={onlyFeatured}
               onChange={(e) => setOnlyFeatured(e.target.checked)}
-              aria-label="只看精选"
+              aria-label="精选"
             />
+            <span className="featured-switch-track" aria-hidden />
             <span>精选</span>
           </label>
           <ImageCountFilter
