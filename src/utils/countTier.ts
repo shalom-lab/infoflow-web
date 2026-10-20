@@ -1,4 +1,4 @@
-/** Map image count → CSS tier class for meta-row tint / count text. */
+/** Map image count → CSS tier class for card border / outer glow. */
 export function countTierClass(n: number): string {
   if (n <= 1) return 'count-tier-1'
   if (n <= 3) return 'count-tier-2'

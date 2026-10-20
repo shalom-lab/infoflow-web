@@ -33,7 +33,7 @@ export function PromptCard({
   const monthYm = promptMonth(prompt)
   const monthLabel = monthYm ? formatMonthLabel(monthYm) : null
   const imgCount = promptImageCount(prompt)
-  const tierClass = countTierClass(imgCount)
+  const tierClass = imgCount > 0 ? countTierClass(imgCount) : ''
 
   const handleCopy = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -66,7 +66,7 @@ export function PromptCard({
     <article
       className={`prompt-card${featured ? ' is-featured' : ''}${
         selectMode && selected ? ' is-selected' : ''
-      }${selectMode ? ' select-mode' : ''}`}
+      }${selectMode ? ' select-mode' : ''}${tierClass ? ` ${tierClass}` : ''}`}
     >
       {selectMode && (
         <label
@@ -95,7 +95,7 @@ export function PromptCard({
       />
 
       <div
-        className={`card-meta ${tierClass}`}
+        className="card-meta"
         role={selectMode ? 'button' : undefined}
         tabIndex={selectMode ? 0 : undefined}
         onClick={selectMode ? handlePrimaryClick : undefined}
