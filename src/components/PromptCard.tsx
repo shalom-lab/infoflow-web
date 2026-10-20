@@ -2,7 +2,7 @@ import { useState, type MouseEvent } from 'react'
 import type { GithubSettings } from '../github/types'
 import { promptImageCount, promptMonth, type PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
-import { countTierClass } from '../utils/countTier'
+import { countSignalBars } from '../utils/countTier'
 import { formatMonthLabel } from './MonthFilter'
 import { PromptCover } from './PromptCover'
 
@@ -17,6 +17,8 @@ interface Props {
   selected?: boolean
   onToggleSelect?: (prompt: PromptItem) => void
 }
+
+const BAR_INDEXES = [1, 2, 3, 4, 5] as const
 
 export function PromptCard({
   prompt,
@@ -33,7 +35,7 @@ export function PromptCard({
   const monthYm = promptMonth(prompt)
   const monthLabel = monthYm ? formatMonthLabel(monthYm) : null
   const imgCount = promptImageCount(prompt)
-  const tierClass = imgCount > 0 ? countTierClass(imgCount) : ''
+  const litBars = imgCount > 0 ? countSignalBars(imgCount) : 0
 
   const handleCopy = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -66,7 +68,7 @@ export function PromptCard({
     <article
       className={`prompt-card${featured ? ' is-featured' : ''}${
         selectMode && selected ? ' is-selected' : ''
-      }${selectMode ? ' select-mode' : ''}${tierClass ? ` ${tierClass}` : ''}`}
+      }${selectMode ? ' select-mode' : ''}`}
     >
       {selectMode && (
         <label
@@ -122,10 +124,20 @@ export function PromptCard({
         <div className="card-meta-right">
           {imgCount > 0 && (
             <span
-              className={`card-count ${tierClass}`}
+              className="card-count"
               title={`${imgCount} 张效果图`}
+              aria-label={`${imgCount} 张效果图`}
             >
-              {imgCount}张
+              <span className="card-count-bars" aria-hidden>
+                {BAR_INDEXES.map((i) => (
+                  <span
+                    key={i}
+                    className={`card-count-bar${i <= litBars ? ' is-on' : ''}`}
+                    style={{ ['--bar-i' as string]: i }}
+                  />
+                ))}
+              </span>
+              <span className="card-count-num">{imgCount}张</span>
             </span>
           )}
           {!selectMode && (

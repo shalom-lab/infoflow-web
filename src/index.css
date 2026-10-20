@@ -1222,78 +1222,7 @@ strong {
     var(--shadow-sm);
 }
 
-/* 张数档位：整卡彩色描边 + 外发光（越多越明显）；卡内保持白底 */
-.prompt-card.count-tier-1 {
-  border-color: #d4d4d4;
-  box-shadow:
-    0 0 0 1px rgba(163, 163, 163, 0.18),
-    0 0 8px rgba(163, 163, 163, 0.2),
-    var(--shadow-sm);
-}
-.prompt-card.count-tier-2 {
-  border-color: #a5b4fc;
-  box-shadow:
-    0 0 0 1px rgba(99, 102, 241, 0.22),
-    0 0 12px rgba(99, 102, 241, 0.28),
-    var(--shadow-sm);
-}
-.prompt-card.count-tier-3 {
-  border-color: #c084fc;
-  box-shadow:
-    0 0 0 1px rgba(147, 51, 234, 0.26),
-    0 0 16px rgba(147, 51, 234, 0.34),
-    var(--shadow-sm);
-}
-.prompt-card.count-tier-4 {
-  border-color: #8b5cf6;
-  box-shadow:
-    0 0 0 1px rgba(124, 58, 237, 0.3),
-    0 0 20px rgba(124, 58, 237, 0.4),
-    var(--shadow-sm);
-}
-.prompt-card.count-tier-5 {
-  border-color: #fb7185;
-  box-shadow:
-    0 0 0 1px rgba(225, 29, 72, 0.32),
-    0 0 24px rgba(225, 29, 72, 0.45),
-    var(--shadow-sm);
-}
-.prompt-card.count-tier-1:hover {
-  border-color: #a3a3a3;
-  box-shadow:
-    0 0 0 1px rgba(163, 163, 163, 0.28),
-    0 0 12px rgba(163, 163, 163, 0.3),
-    var(--shadow);
-}
-.prompt-card.count-tier-2:hover {
-  border-color: #818cf8;
-  box-shadow:
-    0 0 0 1px rgba(99, 102, 241, 0.32),
-    0 0 16px rgba(99, 102, 241, 0.38),
-    var(--shadow);
-}
-.prompt-card.count-tier-3:hover {
-  border-color: #a855f7;
-  box-shadow:
-    0 0 0 1px rgba(147, 51, 234, 0.34),
-    0 0 20px rgba(147, 51, 234, 0.42),
-    var(--shadow);
-}
-.prompt-card.count-tier-4:hover {
-  border-color: #7c3aed;
-  box-shadow:
-    0 0 0 1px rgba(124, 58, 237, 0.38),
-    0 0 24px rgba(124, 58, 237, 0.48),
-    var(--shadow);
-}
-.prompt-card.count-tier-5:hover {
-  border-color: #e11d48;
-  box-shadow:
-    0 0 0 1px rgba(225, 29, 72, 0.4),
-    0 0 28px rgba(225, 29, 72, 0.52),
-    var(--shadow);
-}
-/* 多选态优先于张数光晕，保证选中反馈清晰 */
+/* 多选态选中反馈 */
 .prompt-card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent),
@@ -1445,7 +1374,7 @@ strong {
   background: rgba(20, 20, 28, 0.78);
 }
 
-/* Compact meta row: 年月 …弹性… N张 复制 星标；底栏统一白底 */
+/* Compact meta row: 年月 …弹性… 信号格(+极小数字) 复制 星标；底栏统一白底 */
 .card-meta {
   display: flex;
   align-items: center;
@@ -1481,35 +1410,38 @@ strong {
   flex-shrink: 0;
 }
 
+/* 张数：5 格信号条 + 极小数字；未亮灰、点亮站点紫 */
 .card-count {
   flex-shrink: 0;
-  font-size: 0.65rem;
-  font-weight: 550;
-  line-height: 1.2;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.22rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.card-count-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 0.82rem;
+}
+.card-count-bar {
+  width: 2.5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--border-strong) 75%, transparent);
+  height: calc(0.26rem + (var(--bar-i, 1) - 1) * 0.135rem);
+}
+.card-count-bar.is-on {
+  background: var(--accent);
+}
+.card-count-num {
+  font-size: 0.52rem;
+  font-weight: 500;
+  line-height: 1;
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
   color: var(--text-faint);
-}
-.card-count.count-tier-1 {
-  color: #a3a3a3;
-  text-shadow: 0 0 4px rgba(163, 163, 163, 0.35);
-}
-.card-count.count-tier-2 {
-  color: #6366f1; /* 靛 */
-  text-shadow: 0 0 5px rgba(99, 102, 241, 0.4);
-}
-.card-count.count-tier-3 {
-  color: #9333ea; /* 紫 */
-  text-shadow: 0 0 6px rgba(147, 51, 234, 0.45);
-}
-.card-count.count-tier-4 {
-  color: #7c3aed; /* 深紫 */
-  text-shadow: 0 0 7px rgba(124, 58, 237, 0.5);
-}
-.card-count.count-tier-5 {
-  color: #e11d48; /* 暖玫 */
-  text-shadow: 0 0 8px rgba(225, 29, 72, 0.55);
+  transform: translateY(0.5px);
 }
 
 .card-meta-actions {
