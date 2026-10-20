@@ -40,42 +40,44 @@ export function ImageCountFilter({
   }
 
   return (
-    <div className="image-count-filter" aria-label="按效果图张数筛选">
-      <span className="icf-label">张数</span>
-      <span className="icf-val" aria-hidden>
-        {lo}
-      </span>
-      <div className="icf-slider">
-        <div className="icf-track" aria-hidden>
-          <div
-            className="icf-range"
-            style={{ left: `${leftPct}%`, width: `${rightPct - leftPct}%` }}
+    <div className="sidebar-section image-count-filter" aria-label="按效果图张数筛选">
+      <div className="sidebar-section-title">张数</div>
+      <div className="sidebar-section-body icf-controls">
+        <span className="icf-val" aria-hidden>
+          {lo}
+        </span>
+        <div className="icf-slider">
+          <div className="icf-track" aria-hidden>
+            <div
+              className="icf-range"
+              style={{ left: `${leftPct}%`, width: `${rightPct - leftPct}%` }}
+            />
+          </div>
+          <input
+            type="range"
+            className="icf-thumb icf-thumb-min"
+            min={loBound}
+            max={hiBound}
+            step={1}
+            value={lo}
+            onChange={(e) => setMin(Number(e.target.value))}
+            aria-label="最少张数"
+          />
+          <input
+            type="range"
+            className="icf-thumb icf-thumb-max"
+            min={loBound}
+            max={hiBound}
+            step={1}
+            value={hi}
+            onChange={(e) => setMax(Number(e.target.value))}
+            aria-label="最多张数"
           />
         </div>
-        <input
-          type="range"
-          className="icf-thumb icf-thumb-min"
-          min={loBound}
-          max={hiBound}
-          step={1}
-          value={lo}
-          onChange={(e) => setMin(Number(e.target.value))}
-          aria-label="最少张数"
-        />
-        <input
-          type="range"
-          className="icf-thumb icf-thumb-max"
-          min={loBound}
-          max={hiBound}
-          step={1}
-          value={hi}
-          onChange={(e) => setMax(Number(e.target.value))}
-          aria-label="最多张数"
-        />
+        <span className="icf-val" aria-hidden>
+          {hi}
+        </span>
       </div>
-      <span className="icf-val" aria-hidden>
-        {hi}
-      </span>
     </div>
   )
 }

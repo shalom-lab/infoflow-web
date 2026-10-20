@@ -432,20 +432,24 @@ export function HomePage({ settings }: Props) {
 
       <div className="home-body">
         <aside className="home-sidebar" aria-label="侧栏筛选">
-          <label
-            className={`featured-switch${onlyFeatured ? ' is-on' : ''}`}
-            title="开：只看精选；关：全部"
-          >
-            <input
-              type="checkbox"
-              role="switch"
-              checked={onlyFeatured}
-              onChange={(e) => setOnlyFeatured(e.target.checked)}
-              aria-label="精选"
-            />
-            <span className="featured-switch-track" aria-hidden />
-            <span>精选</span>
-          </label>
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">精选</div>
+            <div className="sidebar-section-body">
+              <label
+                className={`featured-switch${onlyFeatured ? ' is-on' : ''}`}
+                title="开：只看精选；关：全部"
+              >
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={onlyFeatured}
+                  onChange={(e) => setOnlyFeatured(e.target.checked)}
+                  aria-label="精选"
+                />
+                <span className="featured-switch-track" aria-hidden />
+              </label>
+            </div>
+          </div>
           <ImageCountFilter
             boundMin={imageCountBoundMin}
             boundMax={imageCountBoundMax}

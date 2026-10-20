@@ -265,16 +265,11 @@ strong {
 .featured-switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
   flex-shrink: 0;
   cursor: pointer;
   user-select: none;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
   position: relative;
+  line-height: 0;
 }
 .featured-switch input {
   position: absolute;
@@ -315,9 +310,6 @@ strong {
 .featured-switch input:focus-visible + .featured-switch-track {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-.featured-switch.is-on {
-  color: var(--accent);
 }
 .home-filters-toggle {
   margin-left: auto;
@@ -751,24 +743,19 @@ strong {
 
 /* Image-count dual range (compact; sidebar-width, not full main) */
 .image-count-filter {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
   max-width: 100%;
   width: 100%;
-  padding: 0.1rem 0.15rem;
   box-sizing: border-box;
 }
-.icf-label {
-  flex-shrink: 0;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-faint);
-  letter-spacing: 0.02em;
+.icf-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 9.5rem;
 }
 .icf-val {
   flex-shrink: 0;
-  min-width: 0.9rem;
+  min-width: 0.85rem;
   text-align: center;
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
@@ -904,78 +891,67 @@ strong {
   scrollbar-width: thin;
 }
 
-/* Left sidebar: 精选 → 张数 → 年月 */
+/* Left sidebar: 精选 → 张数 → 年月（统一栏目标题 + 缩进控件） */
 .home-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.85rem;
   align-self: stretch;
   height: 100%;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 0.05rem 0 0.2rem;
+  padding: 0.1rem 0 0.2rem;
 }
-.home-sidebar > .featured-switch {
-  padding: 0.1rem 0.4rem;
-  font-size: 0.75rem;
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
 }
-/* 张数：侧栏内短滑条（标签+区间一行，滑条第二行） */
-.home-sidebar > .image-count-filter {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas:
-    'label lo hi'
-    'slider slider slider';
-  column-gap: 0.25rem;
-  row-gap: 0.15rem;
-  align-items: center;
-  max-width: 100%;
-  width: 100%;
-  padding: 0.05rem 0.35rem 0.15rem;
+.sidebar-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  padding: 0 0.15rem;
+  text-align: left;
 }
-.home-sidebar .image-count-filter .icf-label {
-  grid-area: label;
+.sidebar-section-body {
+  padding-left: 0.55rem;
+  min-width: 0;
+}
+
+.home-sidebar > .sidebar-section.image-count-filter .icf-controls {
+  max-width: 8.5rem;
 }
 .home-sidebar .image-count-filter .icf-val {
-  min-width: 0.85rem;
   font-size: 0.68rem;
 }
-.home-sidebar .image-count-filter > .icf-val:first-of-type {
-  grid-area: lo;
-  justify-self: end;
-}
-.home-sidebar .image-count-filter > .icf-val:last-of-type {
-  grid-area: hi;
-  justify-self: start;
-}
 .home-sidebar .image-count-filter .icf-slider {
-  grid-area: slider;
-  width: 100%;
-  flex: none;
+  flex: 1 1 auto;
+  width: auto;
   min-width: 0;
 }
 
 .month-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
+}
+.month-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 0.05rem 0.15rem 0.35rem 0;
+  padding: 0 0.15rem 0.35rem 0;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-}
-.month-filter-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--text-faint);
-  letter-spacing: 0.04em;
-  text-transform: none;
-  padding: 0 0.45rem 0.2rem;
 }
 .month-chip {
   appearance: none;
@@ -1016,46 +992,38 @@ strong {
     display: grid;
     grid-template-columns: auto minmax(0, 11rem) 1fr;
     grid-template-rows: auto auto;
-    align-items: center;
-    column-gap: 0.55rem;
-    row-gap: 0.3rem;
+    align-items: start;
+    column-gap: 0.7rem;
+    row-gap: 0.45rem;
     height: auto;
     overflow: visible;
     padding: 0;
+    gap: 0;
   }
-  .home-sidebar > .featured-switch {
+  .home-sidebar > .sidebar-section:first-child {
     grid-column: 1;
     grid-row: 1;
-    padding: 0.1rem 0;
   }
-  /* 短张数，勿拉满整行 */
-  .home-sidebar > .image-count-filter {
+  .home-sidebar > .sidebar-section.image-count-filter {
     grid-column: 2;
     grid-row: 1;
     width: 100%;
     max-width: 11rem;
-    padding: 0.05rem 0;
   }
-  .home-sidebar > .month-filter {
+  .home-sidebar > .sidebar-section.month-filter {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-  .month-filter {
-    position: relative;
     flex: none;
+    overflow: visible;
+  }
+  .month-filter-list {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    height: auto;
-    max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 0.1rem 0 0.2rem;
+    padding: 0 0 0.1rem;
     gap: 0.3rem;
-  }
-  .month-filter-label {
-    flex-shrink: 0;
-    padding: 0 0.15rem 0 0;
   }
   .month-chip {
     width: auto;
