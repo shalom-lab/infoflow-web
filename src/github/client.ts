@@ -105,6 +105,74 @@ function encodeUtf8ToBase64(text: string): string {
   }
   return btoa(binary)
 }
+/**
+ * Resolve UTF-8 text from Contents API metadata.
+ * Files >1MB omit base64 `content` (encoding often "none"); fall back to
+ * download_url (preferred) then git blobs API.
+ */
+async function resolveFileText(
+  settings: GithubSettings,
+  data: GithubFileContent,
+  label: string,
+): Promise<string> {
+  if (
+    data.encoding === 'base64' &&
+    typeof data.content === 'string' &&
+    data.content.length > 0
+  ) {
+    return decodeBase64ToUtf8(data.content)
+  }
+
+  const { owner, name } = requireRepo(settings)
+  let lastDetail = '无可用备用通道'
+
+  // Prefer download_url — simple raw text, works with same Authorization.
+  if (data.download_url) {
+    try {
+      const headers = new Headers()
+      headers.set('Authorization', `Bearer ${settings.token.trim()}`)
+      // raw.githubusercontent.com: avoid non-CORS-safelisted Accept when possible
+      const res = await fetch(data.download_url, {
+        headers,
+        cache: 'no-store',
+      })
+      if (res.ok) {
+        return await res.text()
+      }
+      lastDetail = `download_url HTTP ${res.status}`
+    } catch (e) {
+      lastDetail =
+        e instanceof Error ? `download_url: ${e.message}` : 'download_url 网络错误'
+    }
+  }
+
+  // Blob API supports larger files (base64 up to ~100MB).
+  if (data.sha) {
+    try {
+      const blobPath = `/repos/${owner}/${name}/git/blobs/${data.sha}`
+      const res = await githubFetch(settings, blobPath)
+      if (!res.ok) await parseError(res)
+      const blob = (await res.json()) as { content?: string; encoding?: string }
+      if (
+        blob.encoding === 'base64' &&
+        typeof blob.content === 'string' &&
+        blob.content.length > 0
+      ) {
+        return decodeBase64ToUtf8(blob.content)
+      }
+      lastDetail = 'git/blobs 未返回 base64 content'
+    } catch (e) {
+      if (e instanceof GithubApiError) throw e
+      lastDetail =
+        e instanceof Error ? `git/blobs: ${e.message}` : 'git/blobs 失败'
+    }
+  }
+
+  throw new GithubApiError(
+    422,
+    `文件过大改用备用通道失败（${label}）：${lastDetail}`,
+  )
+}
 
 export type PromptsRemoteResult = {
   prompts: PromptItem[]
@@ -134,10 +202,10 @@ export async function loadPromptsRemote(
 
   const etag = res.headers.get('ETag')
   const data = (await res.json()) as GithubFileContent
-  if (data.encoding !== 'base64' || typeof data.content !== 'string') {
-    throw new GithubApiError(422, '无法解码文件内容')
+  if (!data.sha) {
+    throw new GithubApiError(422, '无法解码文件内容：缺少 sha')
   }
-  const text = decodeBase64ToUtf8(data.content)
+  const text = await resolveFileText(settings, data, PROMPTS_PATH)
   const parsed = JSON.parse(text) as unknown
   return {
     prompts: normalizePrompts(parsed),
@@ -374,10 +442,10 @@ export async function loadFeaturedRemote(
     await parseError(res)
   }
   const data = (await res.json()) as GithubFileContent
-  if (data.encoding !== 'base64' || typeof data.content !== 'string') {
-    throw new GithubApiError(422, '无法解码精选文件')
+  if (!data.sha) {
+    throw new GithubApiError(422, '无法解码精选文件：缺少 sha')
   }
-  const text = decodeBase64ToUtf8(data.content)
+  const text = await resolveFileText(settings, data, FEATURED_PATH)
   let parsed: unknown = {}
   try {
     parsed = JSON.parse(text) as unknown

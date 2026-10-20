@@ -40,8 +40,11 @@ export interface GithubFileContent {
   path: string
   sha: string
   size: number
-  content: string
-  encoding: string
+  /** Present for files ≤1MB; omitted/empty when Contents API uses encoding "none". */
+  content?: string
+  encoding?: string
+  /** Raw file URL; prefer for files >1MB (Contents omits base64 content). */
+  download_url?: string | null
 }
 
 export class GithubApiError extends Error {
