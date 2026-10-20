@@ -1085,14 +1085,23 @@ strong {
 }
 
 .card-body {
-  padding: 0.55rem 0.65rem 0.7rem;
+  padding: 0.55rem 0.65rem 0.65rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
 }
 
 .card-title {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: 0.86rem;
   font-weight: 650;
   letter-spacing: -0.015em;
@@ -1104,11 +1113,13 @@ strong {
 }
 
 .card-month {
-  margin: -0.15rem 0 0;
-  font-size: 0.7rem;
+  flex-shrink: 0;
+  margin: 0.12rem 0 0;
+  font-size: 0.68rem;
   line-height: 1.2;
   color: var(--text-faint);
   font-weight: 450;
+  white-space: nowrap;
 }
 
 .card-tags {

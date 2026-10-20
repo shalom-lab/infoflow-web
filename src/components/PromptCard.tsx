@@ -4,15 +4,12 @@ import { promptMonth, type PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
 import { formatMonthLabel } from './MonthFilter'
 import { PromptCover } from './PromptCover'
-import { TagCapsule } from './TagCapsule'
 
 interface Props {
   prompt: PromptItem
   settings: GithubSettings | null
   imagesEnabled: boolean
   featured: boolean
-  onKeywordClick?: (kw: string) => void
-  activeKeyword?: string | null
   onOpenDetail: (prompt: PromptItem) => void
   onToggleFeatured: (promptId: string) => void
   selectMode?: boolean
@@ -25,8 +22,6 @@ export function PromptCard({
   settings,
   imagesEnabled,
   featured,
-  onKeywordClick,
-  activeKeyword,
   onOpenDetail,
   onToggleFeatured,
   selectMode = false,
@@ -137,36 +132,16 @@ export function PromptCard({
             : undefined
         }
       >
-        <h3 className="card-title" title={title}>
-          {title}
-        </h3>
-
-        {monthLabel && monthYm && (
-          <time className="card-month" dateTime={monthYm}>
-            {monthLabel}
-          </time>
-        )}
-
-        {prompt.keywords.length > 0 && (
-          <div className="card-tags">
-            {prompt.keywords.map((kw) => (
-              <TagCapsule
-                key={kw}
-                label={kw}
-                active={activeKeyword === kw}
-                onClick={
-                  onKeywordClick
-                    ? (e) => {
-                        e.stopPropagation()
-                        if (selectMode) return
-                        onKeywordClick(kw)
-                      }
-                    : undefined
-                }
-              />
-            ))}
-          </div>
-        )}
+        <div className="card-title-row">
+          <h3 className="card-title" title={title}>
+            {title}
+          </h3>
+          {monthLabel && monthYm && (
+            <time className="card-month" dateTime={monthYm}>
+              {monthLabel}
+            </time>
+          )}
+        </div>
       </div>
     </article>
   )
