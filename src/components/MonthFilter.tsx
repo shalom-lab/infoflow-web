@@ -2,6 +2,10 @@ interface Props {
   months: string[]
   selected: string | null
   onSelect: (month: string | null) => void
+  /** Facet counts per YYYY-MM (other filters applied, month excluded). */
+  counts: Record<string, number>
+  /** 「全部」= total under other filters (prompt cards). */
+  total: number
 }
 
 /** Display `2026-10` as `2026年10月`. */
@@ -13,7 +17,13 @@ export function formatMonthLabel(ym: string): string {
   return `${m[1]}年${month}月`
 }
 
-export function MonthFilter({ months, selected, onSelect }: Props) {
+export function MonthFilter({
+  months,
+  selected,
+  onSelect,
+  counts,
+  total,
+}: Props) {
   if (months.length === 0) return null
 
   return (
@@ -25,7 +35,8 @@ export function MonthFilter({ months, selected, onSelect }: Props) {
           className={`month-chip${selected == null ? ' active' : ''}`}
           onClick={() => onSelect(null)}
         >
-          全部
+          <span className="month-chip-label">全部</span>
+          <span className="month-chip-count">{total}</span>
         </button>
         {months.map((ym) => (
           <button
@@ -34,7 +45,8 @@ export function MonthFilter({ months, selected, onSelect }: Props) {
             className={`month-chip${selected === ym ? ' active' : ''}`}
             onClick={() => onSelect(selected === ym ? null : ym)}
           >
-            {formatMonthLabel(ym)}
+            <span className="month-chip-label">{formatMonthLabel(ym)}</span>
+            <span className="month-chip-count">{counts[ym] ?? 0}</span>
           </button>
         ))}
       </div>

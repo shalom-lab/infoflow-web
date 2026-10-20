@@ -313,6 +313,46 @@ export function HomePage({ settings }: Props) {
     })
   }, [baseFiltered, replyKeywords])
 
+  /** Month facets: apply every filter except year/month, then count by month. */
+  const monthFacetBase = useMemo(() => {
+    const want =
+      replyKeywords.length > 0 ? new Set(replyKeywords) : null
+    return prompts.filter((p) => {
+      if (onlyFeatured && !isFeatured(p.prompt_id)) return false
+      if (countFilterActive) {
+        const n = promptImageCount(p)
+        if (n < countMin || n > effectiveCountMax) return false
+      }
+      if (!matchesQuery(p, query)) return false
+      if (want) {
+        const rk = p.reply_keyword?.trim()
+        if (!rk || !want.has(rk)) return false
+      }
+      return true
+    })
+  }, [
+    prompts,
+    query,
+    countMin,
+    effectiveCountMax,
+    countFilterActive,
+    onlyFeatured,
+    isFeatured,
+    replyKeywords,
+  ])
+
+  const monthCounts = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const p of monthFacetBase) {
+      const m = promptMonth(p)
+      if (!m) continue
+      map[m] = (map[m] ?? 0) + 1
+    }
+    return map
+  }, [monthFacetBase])
+
+  const monthTotal = monthFacetBase.length
+
   const toggleReplyKeyword = useCallback((kw: string) => {
     setReplyKeywords((prev) =>
       prev.includes(kw) ? prev.filter((k) => k !== kw) : [...prev, kw],
@@ -462,6 +502,8 @@ export function HomePage({ settings }: Props) {
             months={availableMonths}
             selected={selectedMonth}
             onSelect={setSelectedMonth}
+            counts={monthCounts}
+            total={monthTotal}
           />
         </aside>
         <div className="home-main">
