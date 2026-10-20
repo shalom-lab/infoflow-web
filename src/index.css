@@ -165,7 +165,8 @@ strong {
 .app-header.compact {
   flex-wrap: nowrap;
   gap: 0.55rem 0.85rem;
-  min-height: 2.1rem;
+  min-height: 2.25rem;
+  align-items: center;
 }
 .app-header.compact .brand-mark {
   width: 26px;
@@ -252,6 +253,8 @@ strong {
   flex-wrap: nowrap;
   align-items: center;
   flex-shrink: 0;
+  /* Keep sm buttons fully inside; avoid top radius clipped by ancestors */
+  min-height: 2rem;
 }
 .header-actions .home-filters-toggle {
   margin-left: 0;
@@ -263,8 +266,11 @@ strong {
   position: relative;
   flex-shrink: 0;
   z-index: 40;
+  /* Negative margin cancels shell pad-y; pad-top must be >= shell-pad-y so
+     header buttons are not clipped by .home-page { overflow: hidden }. */
   margin: calc(-1 * var(--shell-pad-y)) 0 0.2rem;
-  padding: 0.65rem 0 0.5rem;
+  padding: calc(var(--shell-pad-y) + 0.15rem) 0 0.55rem;
+  overflow: visible;
   background: transparent;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   box-shadow: none;
@@ -612,7 +618,7 @@ strong {
 @media (max-width: 640px) {
   .home-sticky {
     margin: calc(-1 * var(--shell-pad-y)) 0 0.15rem;
-    padding: 0.55rem 0 0.4rem;
+    padding: calc(var(--shell-pad-y) + 0.1rem) 0 0.45rem;
   }
   .home-sticky .keyword-filter {
     max-height: 3.6rem;
