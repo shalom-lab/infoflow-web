@@ -83,7 +83,7 @@
 }
 
 html {
-  overflow-y: scroll;
+  overflow-y: auto;
   scrollbar-gutter: stable;
 }
 
@@ -91,6 +91,7 @@ html,
 body,
 #root {
   margin: 0;
+  height: 100%;
   min-height: 100%;
 }
 
@@ -128,6 +129,24 @@ strong {
   max-width: 1600px;
   margin: 0 auto;
   padding: 0.85rem 1rem 2.5rem;
+}
+
+/* Home: fill viewport; scroll only below sticky top bar */
+.app-shell:has(.home-page) {
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.home-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Header */
@@ -196,12 +215,12 @@ strong {
   align-items: center;
 }
 
-/* Sticky top bar (logo + actions + search + keyword chips) */
+/* Fixed top bar (logo + actions + search + keyword chips) — does not scroll away */
 .home-sticky {
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 40;
-  margin: -0.85rem -1rem 0.55rem;
+  margin: -0.85rem -1rem 0.45rem;
   padding: 0.75rem 1rem 0.45rem;
   background: var(--bg);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
@@ -407,7 +426,7 @@ strong {
 }
 @media (max-width: 640px) {
   .home-sticky {
-    margin: -0.7rem -0.65rem 0.55rem;
+    margin: -0.7rem -0.65rem 0.4rem;
     padding: 0.65rem 0.65rem 0.4rem;
   }
   .home-sticky .keyword-filter {
@@ -736,24 +755,34 @@ strong {
   font-weight: 560;
 }
 
-/* Home body: left month sidebar + main grid */
+/* Home body: scroll region below top bar (left month + right cards) */
 .home-body {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: 0.75rem 1rem;
-  align-items: start;
+  align-items: stretch;
+  overflow: hidden;
 }
 .home-main {
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .month-filter {
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
-  position: sticky;
-  top: 0.55rem;
-  max-height: calc(100vh - 1.1rem);
+  position: relative;
+  align-self: stretch;
+  max-height: none;
+  height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 0.15rem 0.1rem 0.35rem 0;
   -webkit-overflow-scrolling: touch;
@@ -799,13 +828,15 @@ strong {
 @media (max-width: 720px) {
   .home-body {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 0.45rem;
   }
   .month-filter {
-    position: static;
+    position: relative;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
+    height: auto;
     max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
@@ -1472,6 +1503,9 @@ strong {
 @media (max-width: 640px) {
   .app-shell {
     padding: 0.7rem 0.65rem 2rem;
+  }
+  .app-shell:has(.home-page) {
+    padding-bottom: 0.7rem;
   }
   .prompt-masonry {
     column-count: 2;
