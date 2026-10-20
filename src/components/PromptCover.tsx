@@ -70,7 +70,8 @@ export function PromptCover({
           : undefined
       }
     >
-      {status === 'ok' && coverUrl ? (
+      {/* Prefer cached coverUrl even before status flips — avoids filter remount flash. */}
+      {coverUrl ? (
         <img src={coverUrl} alt="" className="cover-img" loading="lazy" />
       ) : status === 'loading' || status === 'idle' ? (
         <div className="cover-placeholder shimmer" aria-hidden>

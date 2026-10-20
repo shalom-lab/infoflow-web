@@ -240,8 +240,10 @@ export async function testConnection(settings: GithubSettings): Promise<string> 
   return `${data.full_name}${data.private ? ' (private)' : ' (public)'}`
 }
 
-/** Successful object URLs (session). */
+/** Successful object URLs (session). Never revoke on card unmount. */
 const imageUrlCache = new Map<string, string>()
+/** prompt cover objectURLs: `${repo}|${promptId}` → url (survives filter remount). */
+const coverByPromptId = new Map<string, string>()
 /** Definitive 404 misses (session). */
 const imageMissCache = new Set<string>()
 /** In-flight network/IDB lookups. */
@@ -249,6 +251,42 @@ const imageInflight = new Map<string, Promise<string | null>>()
 
 function memKey(settings: GithubSettings, path: string): string {
   return `${settings.repo.trim()}|${path}`
+}
+
+function coverMemKey(settings: GithubSettings, promptId: string): string {
+  return `${settings.repo.trim()}|${promptId}`
+}
+
+/** Sync peek — used so remounted cards can paint without a loading flash. */
+export function peekCachedImageUrl(
+  settings: GithubSettings,
+  path: string,
+): string | null {
+  return imageUrlCache.get(memKey(settings, path)) ?? null
+}
+
+/** Remember cover for a prompt so filter remounts hit sync state. */
+export function rememberPromptCoverUrl(
+  settings: GithubSettings,
+  promptId: string,
+  url: string,
+): void {
+  coverByPromptId.set(coverMemKey(settings, promptId), url)
+}
+
+export function peekPromptCoverUrl(
+  settings: GithubSettings,
+  promptId: string,
+): string | null {
+  return coverByPromptId.get(coverMemKey(settings, promptId)) ?? null
+}
+
+/** True when this path 404'd earlier in the session (skip network). */
+export function peekCachedImageMiss(
+  settings: GithubSettings,
+  path: string,
+): boolean {
+  return imageMissCache.has(memKey(settings, path))
 }
 
 function isAbortError(e: unknown): boolean {
@@ -396,6 +434,7 @@ export function clearImageCache(): void {
     URL.revokeObjectURL(url)
   }
   imageUrlCache.clear()
+  coverByPromptId.clear()
   imageMissCache.clear()
   imageInflight.clear()
 }
