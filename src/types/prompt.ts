@@ -83,9 +83,14 @@ export function knownImageRepoPaths(
   images?: string[],
 ): string[] | null {
   if (images && images.length > 0) {
-    const paths = images
-      .map(resolveImageRepoPath)
-      .filter((p): p is string => Boolean(p))
+    const seen = new Set<string>()
+    const paths: string[] = []
+    for (const rel of images) {
+      const p = resolveImageRepoPath(rel)
+      if (!p || seen.has(p)) continue
+      seen.add(p)
+      paths.push(p)
+    }
     return paths.length > 0 ? paths : null
   }
   if (image) {
@@ -104,20 +109,29 @@ export function promptMonth(p: PromptItem): string | null {
   return null
 }
 
-/** Declared gallery size from aggregate `image_count`, else images/image. */
+/**
+ * Declared gallery size for badge/filter.
+ * Prefer aggregate `image_count` when present, but never exceed the unique
+ * recorded `images` list (guards against a inflated summary count).
+ */
 export function promptImageCount(p: {
   image_count?: number
   image?: string
   images?: string[]
 }): number {
+  const known = knownImageRepoPaths(p.image, p.images)
+  const listLen = known?.length ?? 0
+
   if (
     typeof p.image_count === 'number' &&
     Number.isFinite(p.image_count) &&
     p.image_count >= 0
   ) {
-    return Math.floor(p.image_count)
+    const declared = Math.floor(p.image_count)
+    if (listLen > 0) return Math.min(declared, listLen)
+    return declared
   }
-  if (p.images && p.images.length > 0) return p.images.length
+  if (listLen > 0) return listLen
   if (p.image && p.image.trim()) return 1
   return 0
 }

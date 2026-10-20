@@ -13,12 +13,21 @@ import {
   resolveImageRepoPath,
 } from '../types/prompt'
 
-const MAX_IMAGES = 12
+/** Probe-mode ceiling when gallery paths are unknown (consecutive -N.png). */
+const MAX_PROBE_IMAGES = 12
+/** Absolute safety ceiling for recorded gallery paths. */
+const MAX_KNOWN_IMAGES = 64
 
 export type ImageLoadStatus = 'idle' | 'loading' | 'ok' | 'empty'
 
 export type UsePromptImagesOpts = {
   lazy?: boolean
+  /**
+   * Max images to load in probe mode, or an explicit gallery cap.
+   * When recorded `images` paths exist, the gallery uses
+   * min(known.length, max ?? MAX_KNOWN_IMAGES) so counts are not
+   * silently truncated to the old probe default of 12.
+   */
   max?: number
   /** Cover path from aggregated record (do not conflate with images). */
   image?: string
@@ -34,6 +43,18 @@ type PeekResult = {
   complete: boolean
 }
 
+/** How many gallery slots to request for this prompt. */
+function galleryLimit(
+  known: string[] | null,
+  optsMax: number | undefined,
+): number {
+  if (known && known.length > 0) {
+    const cap = optsMax ?? MAX_KNOWN_IMAGES
+    return Math.min(known.length, Math.max(1, cap), MAX_KNOWN_IMAGES)
+  }
+  return optsMax ?? MAX_PROBE_IMAGES
+}
+
 /**
  * Sync read of session caches so filter remounts paint the cover immediately
  * (no "加载中…" flash, no GitHub re-fetch for paths already in memory).
@@ -42,7 +63,7 @@ function peekFromSessionCache(
   promptId: string,
   settings: GithubSettings | null,
   enabled: boolean,
-  max: number,
+  limit: number,
   recordImage?: string,
   recordImages?: string[],
 ): PeekResult {
@@ -58,7 +79,7 @@ function peekFromSessionCache(
   let complete = false
 
   if (known) {
-    const slice = known.slice(0, max)
+    const slice = known.slice(0, limit)
     let allHit = true
     for (const path of slice) {
       const url = peekCachedImageUrl(settings, path)
@@ -79,8 +100,8 @@ function peekFromSessionCache(
     complete = allHit && slice.length > 0
     if (coverPath && !peekCachedImageUrl(settings, coverPath)) complete = false
   } else {
-    // Probe mode: consecutive hits; complete at max or when next index is a known 404.
-    for (let i = 0; i < max; i++) {
+    // Probe mode: consecutive hits; complete at limit or when next index is a known 404.
+    for (let i = 0; i < limit; i++) {
       const path = imagePathFor(promptId, i)
       const url = peekCachedImageUrl(settings, path)
       if (url) {
@@ -91,7 +112,7 @@ function peekFromSessionCache(
       break
     }
     if (!cover) cover = found[0] ?? null
-    if (found.length >= max) complete = true
+    if (found.length >= limit) complete = true
   }
 
   if (cover || found.length > 0) {
@@ -118,10 +139,11 @@ export function usePromptImages(
   opts?: UsePromptImagesOpts,
 ) {
   const lazy = opts?.lazy ?? false
-  const max = opts?.max ?? MAX_IMAGES
   const recordImage = opts?.image
   const recordImages = opts?.images
   const recordImagesKey = recordImages?.join('\0') ?? ''
+  const knownForLimit = knownImageRepoPaths(recordImage, recordImages)
+  const limit = galleryLimit(knownForLimit, opts?.max)
   const rootRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(!lazy)
 
@@ -129,7 +151,7 @@ export function usePromptImages(
     promptId,
     settings,
     enabled,
-    max,
+    limit,
     recordImage,
     recordImages,
   )
@@ -160,7 +182,7 @@ export function usePromptImages(
       promptId,
       settings,
       enabled,
-      max,
+      limit,
       recordImage,
       recordImages,
     )
@@ -214,7 +236,7 @@ export function usePromptImages(
       }
 
       if (known) {
-        for (const path of known.slice(0, max)) {
+        for (const path of known.slice(0, limit)) {
           const blobUrl = await fetchOne(path)
           if (cancelled || ac.signal.aborted) return
           if (!blobUrl) continue
@@ -238,7 +260,7 @@ export function usePromptImages(
         }
         if (!cover && found.length > 0) applyCover(found[0] ?? null)
       } else {
-        for (let i = 0; i < max; i++) {
+        for (let i = 0; i < limit; i++) {
           const path = imagePathFor(promptId, i)
           const blobUrl = await fetchOne(path)
           if (cancelled || ac.signal.aborted) return
@@ -272,7 +294,7 @@ export function usePromptImages(
     enabled,
     settings,
     promptId,
-    max,
+    limit,
     recordImage,
     recordImagesKey,
     recordImages,
