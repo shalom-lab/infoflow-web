@@ -1,6 +1,7 @@
 import type { ReactNode, MouseEvent } from 'react'
 import type { GithubSettings } from '../github/types'
 import { usePromptImages } from '../hooks/usePromptImages'
+import { promptImageCount } from '../types/prompt'
 
 interface Props {
   promptId: string
@@ -11,6 +12,8 @@ interface Props {
   image?: string
   /** Gallery paths from record. */
   images?: string[]
+  /** Aggregate `image_count` when present. */
+  imageCount?: number
   onClick?: () => void
   /** Overlay controls (e.g. copy / star), bottom-right. */
   actions?: ReactNode
@@ -26,16 +29,26 @@ export function PromptCover({
   enabled,
   image,
   images,
+  imageCount,
   onClick,
   actions,
 }: Props) {
+  const declaredCount = promptImageCount({
+    image_count: imageCount,
+    image,
+    images,
+  })
   const { rootRef, coverUrl, count, status } = usePromptImages(
     promptId,
     settings,
     enabled,
-    // Cards only need cover (+ few probes for badge); modal loads the rest.
+    // Cards only need cover (+ few probes); badge uses declared count.
     { lazy: true, max: 3, image, images },
   )
+
+  // Prefer summary count; fall back to loaded URLs only when undeclared.
+  const badgeCount = declaredCount > 0 ? declaredCount : count
+  const showBadge = badgeCount > 0 && (declaredCount > 0 || status === 'ok')
 
   const clickable = Boolean(onClick)
 
@@ -70,9 +83,9 @@ export function PromptCover({
         </div>
       )}
 
-      {status === 'ok' && count > 0 && (
-        <span className="cover-badge" title={`${count} 张效果图`}>
-          {count >= 3 ? `${count}+` : `${count}`}张
+      {showBadge && (
+        <span className="cover-badge" title={`${badgeCount} 张效果图`}>
+          {badgeCount}张
         </span>
       )}
 

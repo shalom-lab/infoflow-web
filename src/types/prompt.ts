@@ -9,6 +9,8 @@ export interface PromptItem {
   image?: string
   /** Gallery image relative paths; keep distinct from `image`. */
   images?: string[]
+  /** Aggregate summary count of local effect images (preferred for badge/filter). */
+  image_count?: number
 }
 
 export function normalizePrompts(data: unknown): PromptItem[] {
@@ -34,6 +36,13 @@ export function normalizePrompts(data: unknown): PromptItem[] {
     }
     if (Array.isArray(p.images)) {
       out.images = p.images.map(String).filter((s) => s.trim())
+    }
+    const rawCount = (item as Record<string, unknown>).image_count
+    if (typeof rawCount === 'number' && Number.isFinite(rawCount) && rawCount >= 0) {
+      out.image_count = Math.floor(rawCount)
+    } else if (typeof rawCount === 'string' && rawCount.trim() !== '') {
+      const n = Number(rawCount)
+      if (Number.isFinite(n) && n >= 0) out.image_count = Math.floor(n)
     }
     return out
   })
@@ -93,4 +102,22 @@ export function promptMonth(p: PromptItem): string | null {
   const fromId = String(p.prompt_id ?? '').match(/^(\d{4}-\d{2})/)
   if (fromId) return fromId[1]
   return null
+}
+
+/** Declared gallery size from aggregate `image_count`, else images/image. */
+export function promptImageCount(p: {
+  image_count?: number
+  image?: string
+  images?: string[]
+}): number {
+  if (
+    typeof p.image_count === 'number' &&
+    Number.isFinite(p.image_count) &&
+    p.image_count >= 0
+  ) {
+    return Math.floor(p.image_count)
+  }
+  if (p.images && p.images.length > 0) return p.images.length
+  if (p.image && p.image.trim()) return 1
+  return 0
 }

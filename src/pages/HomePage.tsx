@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ImageCountFilter } from '../components/ImageCountFilter'
 import { KeywordFilter } from '../components/KeywordFilter'
 import { MonthFilter } from '../components/MonthFilter'
 import { PromptCard } from '../components/PromptCard'
@@ -17,7 +18,7 @@ import { friendlyGithubError, type GithubSettings } from '../github/types'
 import { useFeatured } from '../hooks/useFeatured'
 import { useSelectedPrompts } from '../hooks/useSelectedPrompts'
 import { getPromptsCache } from '../idb/cache'
-import { promptMonth, type PromptItem } from '../types/prompt'
+import { promptImageCount, promptMonth, type PromptItem } from '../types/prompt'
 
 interface Props {
   settings: GithubSettings
@@ -50,6 +51,9 @@ export function HomePage({ settings }: Props) {
   const [query, setQuery] = useState('')
   const [keyword, setKeyword] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [countMin, setCountMin] = useState(0)
+  /** null = use full data range (avoids filtering before bounds sync). */
+  const [countMax, setCountMax] = useState<number | null>(null)
   const [onlyFeatured, setOnlyFeatured] = useState(false)
   const [detailPrompt, setDetailPrompt] = useState<PromptItem | null>(null)
   const [selectMode, setSelectMode] = useState(false)
@@ -202,14 +206,40 @@ export function HomePage({ settings }: Props) {
     return [...set].sort((a, b) => b.localeCompare(a))
   }, [prompts])
 
+  const imageCountBoundMax = useMemo(() => {
+    let hi = 0
+    for (const p of prompts) {
+      hi = Math.max(hi, promptImageCount(p))
+    }
+    return hi
+  }, [prompts])
+
+  useEffect(() => {
+    setCountMin(0)
+    setCountMax(null)
+  }, [imageCountBoundMax])
+
+  const effectiveCountMax = countMax ?? imageCountBoundMax
+
   const filtered = useMemo(() => {
     return prompts.filter((p) => {
       if (onlyFeatured && !isFeatured(p.prompt_id)) return false
       if (selectedMonth && promptMonth(p) !== selectedMonth) return false
       if (keyword && !p.keywords.includes(keyword)) return false
+      const n = promptImageCount(p)
+      if (n < countMin || n > effectiveCountMax) return false
       return matchesQuery(p, query)
     })
-  }, [prompts, query, keyword, selectedMonth, onlyFeatured, isFeatured])
+  }, [
+    prompts,
+    query,
+    keyword,
+    selectedMonth,
+    countMin,
+    effectiveCountMax,
+    onlyFeatured,
+    isFeatured,
+  ])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -283,6 +313,16 @@ export function HomePage({ settings }: Props) {
             onChange={setQuery}
             count={sorted.length}
             total={prompts.length}
+          />
+          <ImageCountFilter
+            boundMin={0}
+            boundMax={imageCountBoundMax}
+            valueMin={countMin}
+            valueMax={effectiveCountMax}
+            onChange={(lo, hi) => {
+              setCountMin(lo)
+              setCountMax(hi)
+            }}
           />
         </div>
 

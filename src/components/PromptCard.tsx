@@ -87,6 +87,7 @@ export function PromptCard({
         promptId={prompt.prompt_id}
         image={prompt.image}
         images={prompt.images}
+        imageCount={prompt.image_count}
         settings={settings}
         enabled={imagesEnabled}
         onClick={handlePrimaryClick}
