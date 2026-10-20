@@ -60,6 +60,14 @@ export function useSelectedPrompts() {
     setSelected([])
   }, [])
 
+  const removeMany = useCallback(async (promptIds: string[]) => {
+    const ids = new Set(promptIds)
+    for (const id of ids) {
+      await removeSelectedPrompt(id)
+    }
+    setSelected((prev) => prev.filter((p) => !ids.has(p.prompt_id)))
+  }, [])
+
   return {
     selected,
     count: selected.length,
@@ -67,6 +75,7 @@ export function useSelectedPrompts() {
     isSelected,
     toggle,
     remove,
+    removeMany,
     clear,
   }
 }

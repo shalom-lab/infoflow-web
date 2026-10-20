@@ -9,6 +9,7 @@ import { SearchBar } from '../components/SearchBar'
 import { SelectedDrawer } from '../components/SelectedDrawer'
 import { ToastStack, type ToastItem, type ToastKind } from '../components/Toast'
 import {
+  dispatchDeletePrompts,
   loadDemoPrompts,
   loadPromptsRemote,
   savePromptsToCache,
@@ -85,8 +86,9 @@ export function HomePage({ settings }: Props) {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const { isFeatured, toggleFeatured } = useFeatured(settings, (msg, kind) =>
-    pushToast(msg, kind ?? 'info'),
+  const { isFeatured, toggleFeatured, markFeaturedMany } = useFeatured(
+    settings,
+    (msg, kind) => pushToast(msg, kind ?? 'info'),
   )
 
   const {
@@ -95,8 +97,44 @@ export function HomePage({ settings }: Props) {
     isSelected,
     toggle: toggleSelect,
     remove: removeSelected,
+    removeMany: removeSelectedMany,
     clear: clearSelected,
   } = useSelectedPrompts()
+
+  const [cartBusy, setCartBusy] = useState(false)
+
+  const handleCartFeature = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return
+      // Batch write data/prompt_featured.json via existing saveFeaturedRemote
+      markFeaturedMany(ids)
+    },
+    [markFeaturedMany],
+  )
+
+  const handleCartDelete = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return
+      if (!isConfigured(settings)) {
+        pushToast('请先在设置中配置仓库与 PAT', 'warn')
+        return
+      }
+      setCartBusy(true)
+      try {
+        await dispatchDeletePrompts(settings, ids)
+        await removeSelectedMany(ids)
+        pushToast(
+          '已触发删除工作流。远程删完后请点「刷新」才会反映；已从本地已选列表移除这些项。',
+          'success',
+        )
+      } catch (e) {
+        pushToast(friendlyGithubError(e), 'error')
+      } finally {
+        setCartBusy(false)
+      }
+    },
+    [settings, removeSelectedMany, pushToast],
+  )
 
   const refresh = useCallback(
     async (opts?: { force?: boolean }) => {
@@ -478,9 +516,12 @@ export function HomePage({ settings }: Props) {
       <SelectedDrawer
         open={cartOpen}
         items={selected}
+        busy={cartBusy}
         onClose={() => setCartOpen(false)}
         onRemove={(id) => void removeSelected(id)}
         onClear={() => void clearSelected()}
+        onFeature={(ids) => handleCartFeature(ids)}
+        onDelete={(ids) => handleCartDelete(ids)}
       />
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />

@@ -86,7 +86,12 @@ export function friendlyGithubError(err: unknown): string {
       case 401:
         return '认证失败 (401)：PAT 无效或已过期，请在设置中更新。'
       case 403:
-        return '权限不足 (403)：PAT 需要 Contents 读写权限。'
+        if (/工作流|Actions|actions:|workflow/i.test(msg)) {
+          return msg.includes('403') || msg.startsWith('无权')
+            ? msg
+            : `权限不足 (403)：${msg}`
+        }
+        return '权限不足 (403)：PAT 需要 Contents 读写权限（触发删除还需 Actions: write）。'
       case 404:
         return '未找到 (404)：仓库/分支/路径不存在，或 PAT 无权访问私有仓库。'
       case 409:

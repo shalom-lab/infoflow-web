@@ -522,3 +522,50 @@ export async function saveFeaturedRemote(
   const data = (await res.json()) as { content: { sha: string } }
   return { sha: data.content.sha }
 }
+
+/**
+ * Trigger InfoFlow data-repo workflow "Delete Prompts by ID"
+ * (`.github/workflows/delete-prompts.yml`).
+ * Does not delete Contents files from the browser.
+ */
+export async function dispatchDeletePrompts(
+  settings: GithubSettings,
+  promptIds: string[],
+): Promise<void> {
+  const { owner, name } = requireRepo(settings)
+  const ids = [...new Set(promptIds.map((id) => id.trim()).filter(Boolean))]
+  if (ids.length === 0) {
+    throw new GithubApiError(422, '没有可删除的 prompt_id')
+  }
+  const apiPath = `/repos/${owner}/${name}/actions/workflows/delete-prompts.yml/dispatches`
+  const res = await githubFetch(settings, apiPath, {
+    method: 'POST',
+    body: JSON.stringify({
+      ref: DEFAULT_BRANCH,
+      inputs: {
+        prompt_ids: ids.join('\n'),
+      },
+    }),
+  })
+  if (res.status === 204 || res.ok) return
+  if (res.status === 403) {
+    let message = res.statusText || 'Forbidden'
+    try {
+      const body = (await res.json()) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      // ignore
+    }
+    throw new GithubApiError(
+      403,
+      `无权触发删除工作流（${message}）。请确认 PAT 勾选了 Actions: write（或 classic 的 workflow / repo）。`,
+    )
+  }
+  if (res.status === 404) {
+    throw new GithubApiError(
+      404,
+      '未找到删除工作流 delete-prompts.yml，或仓库/分支不正确。',
+    )
+  }
+  await parseError(res)
+}

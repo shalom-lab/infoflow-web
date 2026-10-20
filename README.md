@@ -56,6 +56,7 @@ npm run preview
 | Classic | 勾选 **`repo`**（私有仓） |
 
 写回精选旁路时还需要 **Contents: Read and write**。
+从已选抽屉触发「删除」时，还需 **Actions: write**（或 classic `workflow` / `repo`），以 `workflow_dispatch` 调用数据仓的 `delete-prompts.yml`。
 
 ## 功能
 

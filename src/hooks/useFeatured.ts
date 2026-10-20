@@ -202,5 +202,37 @@ export function useFeatured(
     [persistLocal, scheduleFlush],
   )
 
-  return { map, isFeatured, toggleFeatured, canSync, reload: hydrate }
+  /** Mark many ids as featured and flush (Contents API side-channel). */
+  const markFeaturedMany = useCallback(
+    (promptIds: string[]) => {
+      if (promptIds.length === 0) return
+      const next = { ...mapRef.current }
+      for (const id of promptIds) next[id] = true
+      mapRef.current = next
+      dirtyRef.current = true
+      setMap(next)
+      void persistLocal(next, shaRef.current, true)
+      const s = settingsRef.current
+      if (isConfigured(s)) {
+        if (timerRef.current) window.clearTimeout(timerRef.current)
+        timerRef.current = null
+        void flushRemote()
+      } else {
+        onNoticeRef.current?.(
+          '精选已保存在本地（未配置 PAT，无法同步到 GitHub）',
+          'warn',
+        )
+      }
+    },
+    [persistLocal, flushRemote],
+  )
+
+  return {
+    map,
+    isFeatured,
+    toggleFeatured,
+    markFeaturedMany,
+    canSync,
+    reload: hydrate,
+  }
 }
