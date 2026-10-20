@@ -27,12 +27,16 @@ export function PromptDetailModal({
   )
   const [index, setIndex] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [kwCopied, setKwCopied] = useState(false)
 
   const title = prompt.wechat_title || prompt.reply_keyword || '(无标题)'
+  const replyKeyword = prompt.reply_keyword?.trim() || ''
   const currentUrl = urls[index] ?? null
 
   useEffect(() => {
     setIndex(0)
+    setKwCopied(false)
+    setCopied(false)
   }, [prompt.prompt_id])
 
   useEffect(() => {
@@ -68,6 +72,15 @@ export function PromptDetailModal({
     }
   }
 
+  const handleCopyKeyword = async () => {
+    if (!replyKeyword) return
+    const ok = await copyText(replyKeyword)
+    if (ok) {
+      setKwCopied(true)
+      window.setTimeout(() => setKwCopied(false), 1400)
+    }
+  }
+
   return (
     <div
       className="modal-backdrop"
@@ -80,15 +93,6 @@ export function PromptDetailModal({
         aria-modal="true"
         aria-labelledby="detail-modal-title"
       >
-        <button
-          type="button"
-          className="modal-close"
-          onClick={onClose}
-          aria-label="关闭"
-        >
-          ×
-        </button>
-
         <div className="detail-layout">
           <div className="detail-media">
             <div className="detail-cover">
@@ -142,25 +146,44 @@ export function PromptDetailModal({
 
           <div className="detail-side">
             <div className="detail-side-top">
-              <div className="detail-side-meta">
+              <div className="detail-topbar">
                 <h2 id="detail-modal-title" className="detail-title">
                   {title}
                 </h2>
-                {prompt.keywords.length > 0 && (
-                  <div className="card-tags detail-tags">
-                    {prompt.keywords.map((kw) => (
-                      <TagCapsule key={kw} label={kw} />
-                    ))}
-                  </div>
-                )}
+                {replyKeyword ? (
+                  <button
+                    type="button"
+                    className={`detail-reply-kw${kwCopied ? ' ok' : ''}`}
+                    onClick={() => void handleCopyKeyword()}
+                    title={kwCopied ? '已复制' : '点击复制口令'}
+                    aria-label={kwCopied ? '口令已复制' : `复制口令 ${replyKeyword}`}
+                  >
+                    {kwCopied ? '已复制' : replyKeyword}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn sm primary detail-copy-btn"
+                  onClick={() => void handleCopy()}
+                >
+                  {copied ? '已复制' : '复制提示词'}
+                </button>
+                <button
+                  type="button"
+                  className="modal-close detail-close-inline"
+                  onClick={onClose}
+                  aria-label="关闭"
+                >
+                  ×
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn sm primary detail-copy-btn"
-                onClick={() => void handleCopy()}
-              >
-                {copied ? '已复制' : '复制提示词'}
-              </button>
+              {prompt.keywords.length > 0 && (
+                <div className="card-tags detail-tags">
+                  {prompt.keywords.map((kw) => (
+                    <TagCapsule key={kw} label={kw} />
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="detail-prompt-wrap">
