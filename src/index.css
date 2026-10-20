@@ -1298,23 +1298,6 @@ strong {
   font-variant-numeric: tabular-nums;
 }
 
-/* Image-count badge tiers: more images → more vivid (紫系协调) */
-.cover-badge.count-tier-1 {
-  background: rgba(20, 20, 28, 0.72);
-}
-.cover-badge.count-tier-2 {
-  background: rgba(55, 78, 168, 0.88); /* 2–3：靛蓝 */
-}
-.cover-badge.count-tier-3 {
-  background: rgba(91, 79, 207, 0.92); /* 4–6：站点紫 */
-}
-.cover-badge.count-tier-4 {
-  background: rgba(168, 48, 168, 0.94); /* 7–11：品红紫 */
-}
-.cover-badge.count-tier-5 {
-  background: rgba(220, 38, 100, 0.95); /* 12+：暖玫红，最醒目 */
-}
-
 .cover-nav {
   position: absolute;
   inset: 0;
@@ -1384,7 +1367,7 @@ strong {
   background: rgba(20, 20, 28, 0.78);
 }
 
-/* Compact meta row under cover: date + count pill + copy + star */
+/* Compact meta row: 年月 …弹性… N张 复制 星标；底栏按张数淡 tint */
 .card-meta {
   display: flex;
   align-items: center;
@@ -1392,6 +1375,23 @@ strong {
   padding: 0.32rem 0.45rem 0.38rem;
   min-height: 1.7rem;
   box-sizing: border-box;
+  background: #fafafa;
+  transition: background 0.15s var(--ease);
+}
+.card-meta.count-tier-1 {
+  background: #fafafa;
+}
+.card-meta.count-tier-2 {
+  background: #eef2ff; /* 2–3：极浅靛 */
+}
+.card-meta.count-tier-3 {
+  background: #f3e8ff; /* 4–6：极浅紫 */
+}
+.card-meta.count-tier-4 {
+  background: #ede9fe; /* 7–11：稍深淡紫 */
+}
+.card-meta.count-tier-5 {
+  background: #ffe4e6; /* 12+：极浅暖玫 */
 }
 
 .card-month {
@@ -1411,41 +1411,41 @@ strong {
   margin: 0;
 }
 
-.card-count-pill {
-  flex-shrink: 0;
-  display: inline-flex;
+.card-meta-right {
+  margin-left: auto;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 1.15rem;
-  height: 1.15rem;
-  padding: 0 0.35rem;
-  border-radius: var(--radius-pill);
-  color: #fff;
+  gap: 0.28rem;
+  flex-shrink: 0;
+}
+
+.card-count {
+  flex-shrink: 0;
   font-size: 0.65rem;
-  font-weight: 650;
-  line-height: 1;
+  font-weight: 550;
+  line-height: 1.2;
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
-  background: rgba(20, 20, 28, 0.72);
+  white-space: nowrap;
+  color: var(--text-faint);
 }
-.card-count-pill.count-tier-1 {
-  background: rgba(20, 20, 28, 0.72);
+.card-count.count-tier-1 {
+  color: #a3a3a3;
 }
-.card-count-pill.count-tier-2 {
-  background: rgba(55, 78, 168, 0.88);
+.card-count.count-tier-2 {
+  color: #6366f1; /* 靛 */
 }
-.card-count-pill.count-tier-3 {
-  background: rgba(91, 79, 207, 0.92);
+.card-count.count-tier-3 {
+  color: #9333ea; /* 紫 */
 }
-.card-count-pill.count-tier-4 {
-  background: rgba(168, 48, 168, 0.94);
+.card-count.count-tier-4 {
+  color: #7c3aed; /* 淡紫更深 */
 }
-.card-count-pill.count-tier-5 {
-  background: rgba(220, 38, 100, 0.95);
+.card-count.count-tier-5 {
+  color: #e11d48; /* 暖玫 */
 }
 
 .card-meta-actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.2rem;

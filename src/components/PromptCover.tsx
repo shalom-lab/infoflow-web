@@ -2,7 +2,6 @@ import type { ReactNode, MouseEvent } from 'react'
 import type { GithubSettings } from '../github/types'
 import { usePromptImages } from '../hooks/usePromptImages'
 import { promptImageCount } from '../types/prompt'
-import { countTierClass } from '../utils/countTier'
 
 interface Props {
   promptId: string
@@ -89,11 +88,8 @@ export function PromptCover({
       )}
 
       {!hideBadge && showBadge && (
-        <span
-          className={`cover-badge ${countTierClass(badgeCount)}`}
-          title={`${badgeCount} 张效果图`}
-        >
-          {badgeCount}
+        <span className="cover-badge" title={`${badgeCount} 张效果图`}>
+          {badgeCount}张
         </span>
       )}
 

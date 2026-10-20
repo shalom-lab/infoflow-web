@@ -33,6 +33,7 @@ export function PromptCard({
   const monthYm = promptMonth(prompt)
   const monthLabel = monthYm ? formatMonthLabel(monthYm) : null
   const imgCount = promptImageCount(prompt)
+  const tierClass = countTierClass(imgCount)
 
   const handleCopy = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -94,7 +95,7 @@ export function PromptCard({
       />
 
       <div
-        className="card-meta"
+        className={`card-meta ${tierClass}`}
         role={selectMode ? 'button' : undefined}
         tabIndex={selectMode ? 0 : undefined}
         onClick={selectMode ? handlePrimaryClick : undefined}
@@ -118,37 +119,39 @@ export function PromptCard({
             —
           </span>
         )}
-        {imgCount > 0 && (
-          <span
-            className={`card-count-pill ${countTierClass(imgCount)}`}
-            title={`${imgCount} 张效果图`}
-          >
-            {imgCount}
-          </span>
-        )}
-        {!selectMode && (
-          <div className="card-meta-actions">
-            <button
-              type="button"
-              className={`card-meta-btn${copied ? ' ok' : ''}`}
-              title={copied ? '已复制' : '复制提示词'}
-              aria-label="复制提示词"
-              onClick={(e) => void handleCopy(e)}
+        <div className="card-meta-right">
+          {imgCount > 0 && (
+            <span
+              className={`card-count ${tierClass}`}
+              title={`${imgCount} 张效果图`}
             >
-              {copied ? '✓' : '⧉'}
-            </button>
-            <button
-              type="button"
-              className={`card-meta-btn star${featured ? ' on' : ''}`}
-              title={featured ? '取消精选' : '标为精选'}
-              aria-label={featured ? '取消精选' : '标为精选'}
-              aria-pressed={featured}
-              onClick={handleStar}
-            >
-              {featured ? '★' : '☆'}
-            </button>
-          </div>
-        )}
+              {imgCount}张
+            </span>
+          )}
+          {!selectMode && (
+            <div className="card-meta-actions">
+              <button
+                type="button"
+                className={`card-meta-btn${copied ? ' ok' : ''}`}
+                title={copied ? '已复制' : '复制提示词'}
+                aria-label="复制提示词"
+                onClick={(e) => void handleCopy(e)}
+              >
+                {copied ? '✓' : '⧉'}
+              </button>
+              <button
+                type="button"
+                className={`card-meta-btn star${featured ? ' on' : ''}`}
+                title={featured ? '取消精选' : '标为精选'}
+                aria-label={featured ? '取消精选' : '标为精选'}
+                aria-pressed={featured}
+                onClick={handleStar}
+              >
+                {featured ? '★' : '☆'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </article>
   )
