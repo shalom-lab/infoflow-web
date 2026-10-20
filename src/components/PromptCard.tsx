@@ -1,7 +1,8 @@
 import { useState, type MouseEvent } from 'react'
 import type { GithubSettings } from '../github/types'
-import { promptMonth, type PromptItem } from '../types/prompt'
+import { promptImageCount, promptMonth, type PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
+import { countTierClass } from '../utils/countTier'
 import { formatMonthLabel } from './MonthFilter'
 import { PromptCover } from './PromptCover'
 
@@ -29,9 +30,9 @@ export function PromptCard({
   onToggleSelect,
 }: Props) {
   const [copied, setCopied] = useState(false)
-  const title = prompt.wechat_title || prompt.reply_keyword || '(无标题)'
   const monthYm = promptMonth(prompt)
   const monthLabel = monthYm ? formatMonthLabel(monthYm) : null
+  const imgCount = promptImageCount(prompt)
 
   const handleCopy = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -89,35 +90,11 @@ export function PromptCard({
         settings={settings}
         enabled={imagesEnabled}
         onClick={handlePrimaryClick}
-        actions={
-          selectMode ? undefined : (
-            <>
-              <button
-                type="button"
-                className={`cover-action-btn${copied ? ' ok' : ''}`}
-                title={copied ? '已复制' : '复制提示词'}
-                aria-label="复制提示词"
-                onClick={(e) => void handleCopy(e)}
-              >
-                {copied ? '✓' : '⧉'}
-              </button>
-              <button
-                type="button"
-                className={`cover-action-btn star${featured ? ' on' : ''}`}
-                title={featured ? '取消精选' : '标为精选'}
-                aria-label={featured ? '取消精选' : '标为精选'}
-                aria-pressed={featured}
-                onClick={handleStar}
-              >
-                {featured ? '★' : '☆'}
-              </button>
-            </>
-          )
-        }
+        hideBadge
       />
 
       <div
-        className="card-body"
+        className="card-meta"
         role={selectMode ? 'button' : undefined}
         tabIndex={selectMode ? 0 : undefined}
         onClick={selectMode ? handlePrimaryClick : undefined}
@@ -132,16 +109,46 @@ export function PromptCard({
             : undefined
         }
       >
-        <div className="card-title-row">
-          <h3 className="card-title" title={title}>
-            {title}
-          </h3>
-          {monthLabel && monthYm && (
-            <time className="card-month" dateTime={monthYm}>
-              {monthLabel}
-            </time>
-          )}
-        </div>
+        {monthLabel && monthYm ? (
+          <time className="card-month" dateTime={monthYm}>
+            {monthLabel}
+          </time>
+        ) : (
+          <span className="card-month card-month--empty" aria-hidden>
+            —
+          </span>
+        )}
+        {imgCount > 0 && (
+          <span
+            className={`card-count-pill ${countTierClass(imgCount)}`}
+            title={`${imgCount} 张效果图`}
+          >
+            {imgCount}
+          </span>
+        )}
+        {!selectMode && (
+          <div className="card-meta-actions">
+            <button
+              type="button"
+              className={`card-meta-btn${copied ? ' ok' : ''}`}
+              title={copied ? '已复制' : '复制提示词'}
+              aria-label="复制提示词"
+              onClick={(e) => void handleCopy(e)}
+            >
+              {copied ? '✓' : '⧉'}
+            </button>
+            <button
+              type="button"
+              className={`card-meta-btn star${featured ? ' on' : ''}`}
+              title={featured ? '取消精选' : '标为精选'}
+              aria-label={featured ? '取消精选' : '标为精选'}
+              aria-pressed={featured}
+              onClick={handleStar}
+            >
+              {featured ? '★' : '☆'}
+            </button>
+          </div>
+        )}
       </div>
     </article>
   )

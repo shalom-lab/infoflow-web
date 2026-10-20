@@ -270,7 +270,8 @@ export function HomePage({ settings }: Props) {
   const effectiveCountMax = countMax ?? imageCountBoundMax
   const countFilterActive = imageCountBoundMax >= imageCountBoundMin
 
-  /** Other filters first; reply_keyword facets come from this subset. */
+  /** Other filters first; reply_keyword facets come from this subset.
+   *  Featured map only affects results when「仅精选」is on — avoid list churn on star toggle. */
   const baseFiltered = useMemo(() => {
     return prompts.filter((p) => {
       if (onlyFeatured && !isFeatured(p.prompt_id)) return false
@@ -289,7 +290,8 @@ export function HomePage({ settings }: Props) {
     effectiveCountMax,
     countFilterActive,
     onlyFeatured,
-    isFeatured,
+    // When「仅精选」off, ignore map identity so star toggle does not rebuild the list.
+    onlyFeatured ? isFeatured : null,
   ])
 
   const topReplyKeywords = useMemo(() => {
@@ -337,7 +339,7 @@ export function HomePage({ settings }: Props) {
     effectiveCountMax,
     countFilterActive,
     onlyFeatured,
-    isFeatured,
+    onlyFeatured ? isFeatured : null,
     replyKeywords,
   ])
 
@@ -359,14 +361,12 @@ export function HomePage({ settings }: Props) {
     )
   }, [])
 
+  // Sort by savedAt only — never by featured. Toggling star must not reshuffle masonry.
   const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      const fa = isFeatured(a.prompt_id) ? 1 : 0
-      const fb = isFeatured(b.prompt_id) ? 1 : 0
-      if (fb !== fa) return fb - fa
-      return (b.savedAt || '').localeCompare(a.savedAt || '')
-    })
-  }, [filtered, isFeatured])
+    return [...filtered].sort((a, b) =>
+      (b.savedAt || '').localeCompare(a.savedAt || ''),
+    )
+  }, [filtered])
 
   return (
     <div className="page home-page">

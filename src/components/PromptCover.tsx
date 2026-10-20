@@ -18,6 +18,8 @@ interface Props {
   onClick?: () => void
   /** Overlay controls (e.g. copy / star), bottom-right. */
   actions?: ReactNode
+  /** Hide image-count badge on cover (card meta row shows it instead). */
+  hideBadge?: boolean
 }
 
 /**
@@ -33,6 +35,7 @@ export function PromptCover({
   imageCount,
   onClick,
   actions,
+  hideBadge = false,
 }: Props) {
   const declaredCount = promptImageCount({
     image_count: imageCount,
@@ -85,7 +88,7 @@ export function PromptCover({
         </div>
       )}
 
-      {showBadge && (
+      {!hideBadge && showBadge && (
         <span
           className={`cover-badge ${countTierClass(badgeCount)}`}
           title={`${badgeCount} 张效果图`}
