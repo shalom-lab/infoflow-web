@@ -13,7 +13,7 @@ interface Props {
   onDelete: (ids: string[]) => void | Promise<void>
 }
 
-type ConfirmKind = 'feature' | 'delete' | null
+type ConfirmKind = 'feature' | 'delete' | 'clear' | null
 
 export function SelectedDrawer({
   open,
@@ -44,6 +44,11 @@ export function SelectedDrawer({
     }
     if (confirm === 'delete') {
       void Promise.resolve(onDelete(ids)).finally(() => setConfirm(null))
+      return
+    }
+    if (confirm === 'clear') {
+      onClear()
+      setConfirm(null)
     }
   }
 
@@ -81,7 +86,7 @@ export function SelectedDrawer({
               type="button"
               className="btn sm danger"
               disabled={empty || busy}
-              onClick={() => void onClear()}
+              onClick={() => setConfirm('clear')}
             >
               清空
             </button>
@@ -163,6 +168,16 @@ export function SelectedDrawer({
         title="删除提示词"
         message={`将触发删除工作流，永久删除这 ${n} 条（含效果图）。远程删完需刷新后才反映；确认后也会从本地已选列表移除。`}
         confirmLabel="触发删除"
+        danger
+        busy={busy}
+        onCancel={closeConfirm}
+        onConfirm={handleConfirm}
+      />
+      <ConfirmModal
+        open={confirm === 'clear'}
+        title="清空已选"
+        message={`清空本地已选的 ${n} 条？仅清除本机列表，不影响远程数据。`}
+        confirmLabel="清空"
         danger
         busy={busy}
         onCancel={closeConfirm}
