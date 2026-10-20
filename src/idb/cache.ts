@@ -2,10 +2,12 @@ import type { FeaturedMap } from '../types/featured'
 import type { PromptItem } from '../types/prompt'
 
 const DB_NAME = 'infoflow-web'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE_PROMPTS = 'prompts'
 const STORE_IMAGES = 'images'
 const STORE_FEATURED = 'featured'
+/** Local selection cart — full PromptItem rows, keyPath prompt_id */
+const STORE_SELECTED = 'selected-prompts'
 
 export type PromptsCacheRecord = {
   /** owner/repo — primary key */
@@ -53,6 +55,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_FEATURED)) {
         db.createObjectStore(STORE_FEATURED, { keyPath: 'repo' })
+      }
+      if (!db.objectStoreNames.contains(STORE_SELECTED)) {
+        db.createObjectStore(STORE_SELECTED, { keyPath: 'prompt_id' })
       }
     }
   })
@@ -245,4 +250,33 @@ export async function getCacheStats(repo?: string): Promise<{
     imageCount,
     featuredCount,
   }
+}
+
+export async function getAllSelectedPrompts(): Promise<PromptItem[]> {
+  try {
+    return await withStore(STORE_SELECTED, 'readonly', async (store) => {
+      const rows = await idbReq(store.getAll() as IDBRequest<PromptItem[]>)
+      return rows ?? []
+    })
+  } catch {
+    return []
+  }
+}
+
+export async function putSelectedPrompt(prompt: PromptItem): Promise<void> {
+  await withStore(STORE_SELECTED, 'readwrite', async (store) => {
+    await idbReq(store.put(prompt))
+  })
+}
+
+export async function removeSelectedPrompt(promptId: string): Promise<void> {
+  await withStore(STORE_SELECTED, 'readwrite', async (store) => {
+    await idbReq(store.delete(promptId))
+  })
+}
+
+export async function clearSelectedPrompts(): Promise<void> {
+  await withStore(STORE_SELECTED, 'readwrite', async (store) => {
+    await idbReq(store.clear())
+  })
 }

@@ -4,6 +4,7 @@ import { KeywordFilter } from '../components/KeywordFilter'
 import { PromptCard } from '../components/PromptCard'
 import { PromptDetailModal } from '../components/PromptDetailModal'
 import { SearchBar } from '../components/SearchBar'
+import { SelectedDrawer } from '../components/SelectedDrawer'
 import { ToastStack, type ToastItem, type ToastKind } from '../components/Toast'
 import {
   loadDemoPrompts,
@@ -13,6 +14,7 @@ import {
 import { isConfigured } from '../github/storage'
 import { friendlyGithubError, type GithubSettings } from '../github/types'
 import { useFeatured } from '../hooks/useFeatured'
+import { useSelectedPrompts } from '../hooks/useSelectedPrompts'
 import { getPromptsCache } from '../idb/cache'
 import type { PromptItem } from '../types/prompt'
 
@@ -48,6 +50,8 @@ export function HomePage({ settings }: Props) {
   const [keyword, setKeyword] = useState<string | null>(null)
   const [onlyFeatured, setOnlyFeatured] = useState(false)
   const [detailPrompt, setDetailPrompt] = useState<PromptItem | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const toastId = useRef(1)
   const configured = isConfigured(settings)
@@ -65,6 +69,15 @@ export function HomePage({ settings }: Props) {
   const { isFeatured, toggleFeatured } = useFeatured(settings, (msg, kind) =>
     pushToast(msg, kind ?? 'info'),
   )
+
+  const {
+    selected,
+    count: selectedCount,
+    isSelected,
+    toggle: toggleSelect,
+    remove: removeSelected,
+    clear: clearSelected,
+  } = useSelectedPrompts()
 
   const refresh = useCallback(
     async (opts?: { force?: boolean }) => {
@@ -197,39 +210,76 @@ export function HomePage({ settings }: Props) {
 
   return (
     <div className="page home-page">
-      <header className="app-header compact">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden>
-            IF
+      <div className="home-sticky">
+        <header className="app-header compact">
+          <div className="brand">
+            <div className="brand-mark" aria-hidden>
+              IF
+            </div>
+            <div>
+              <h1 className="brand-title">InfoFlow Prompt</h1>
+              <p className="brand-sub">效果图 · 提示词卡片</p>
+            </div>
           </div>
-          <div>
-            <h1 className="brand-title">InfoFlow Prompt</h1>
-            <p className="brand-sub">效果图 · 提示词卡片</p>
+          <div className="header-actions">
+            <button
+              type="button"
+              className={`btn sm filter-toggle${onlyFeatured ? ' primary' : ''}`}
+              onClick={() => setOnlyFeatured((v) => !v)}
+              aria-pressed={onlyFeatured}
+            >
+              ★ 精选
+            </button>
+            <button
+              type="button"
+              className={`btn sm filter-toggle${selectMode ? ' primary' : ''}`}
+              onClick={() => setSelectMode((v) => !v)}
+              aria-pressed={selectMode}
+              title="开启后可勾选提示词加入已选"
+            >
+              选择
+            </button>
+            <button
+              type="button"
+              className="btn sm cart-btn"
+              onClick={() => setCartOpen(true)}
+              title="查看已选提示词"
+            >
+              已选
+              {selectedCount > 0 && (
+                <span className="cart-badge">{selectedCount}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className="btn sm"
+              disabled={loading}
+              onClick={() => void refresh({ force: true })}
+              title="强制从 GitHub 拉取并写回 IndexedDB"
+            >
+              {loading ? '同步中…' : '刷新'}
+            </button>
+            <Link to="/settings" className="btn sm primary">
+              设置
+            </Link>
           </div>
+        </header>
+
+        <div className="toolbar">
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            count={sorted.length}
+            total={prompts.length}
+          />
         </div>
-        <div className="header-actions">
-          <button
-            type="button"
-            className={`btn sm filter-toggle${onlyFeatured ? ' primary' : ''}`}
-            onClick={() => setOnlyFeatured((v) => !v)}
-            aria-pressed={onlyFeatured}
-          >
-            ★ 精选
-          </button>
-          <button
-            type="button"
-            className="btn sm"
-            disabled={loading}
-            onClick={() => void refresh({ force: true })}
-            title="强制从 GitHub 拉取并写回 IndexedDB"
-          >
-            {loading ? '同步中…' : '刷新'}
-          </button>
-          <Link to="/settings" className="btn sm primary">
-            设置
-          </Link>
-        </div>
-      </header>
+
+        <KeywordFilter
+          keywords={topKeywords}
+          selected={keyword}
+          onSelect={setKeyword}
+        />
+      </div>
 
       {!configured && (
         <div className="banner warn setup-banner compact-banner">
@@ -247,21 +297,6 @@ export function HomePage({ settings }: Props) {
           </Link>
         </div>
       )}
-
-      <div className="toolbar">
-        <SearchBar
-          value={query}
-          onChange={setQuery}
-          count={sorted.length}
-          total={prompts.length}
-        />
-      </div>
-
-      <KeywordFilter
-        keywords={topKeywords}
-        selected={keyword}
-        onSelect={setKeyword}
-      />
 
       {loading && prompts.length === 0 ? (
         <div className="empty-state">
@@ -286,12 +321,15 @@ export function HomePage({ settings }: Props) {
               activeKeyword={keyword}
               onOpenDetail={setDetailPrompt}
               onToggleFeatured={toggleFeatured}
+              selectMode={selectMode}
+              selected={isSelected(p.prompt_id)}
+              onToggleSelect={(item) => void toggleSelect(item)}
             />
           ))}
         </div>
       )}
 
-      {detailPrompt && (
+      {detailPrompt && !selectMode && (
         <PromptDetailModal
           prompt={detailPrompt}
           settings={configured ? settings : null}
@@ -299,6 +337,14 @@ export function HomePage({ settings }: Props) {
           onClose={() => setDetailPrompt(null)}
         />
       )}
+
+      <SelectedDrawer
+        open={cartOpen}
+        items={selected}
+        onClose={() => setCartOpen(false)}
+        onRemove={(id) => void removeSelected(id)}
+        onClear={() => void clearSelected()}
+      />
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
