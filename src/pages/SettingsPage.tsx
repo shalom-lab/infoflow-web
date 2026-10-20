@@ -4,8 +4,6 @@ import { clearImageCache, testConnection } from '../github/client'
 import {
   clearSettings,
   isConfigured,
-  KEY_REPO,
-  KEY_TOKEN,
   saveSettings,
 } from '../github/storage'
 import {
@@ -94,7 +92,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
     setSaved(next)
     setTokenInput('')
     onSaved(next)
-    setMsg('已保存到浏览器 localStorage（不会提交到仓库）')
+    setMsg('已保存')
     setErr(null)
     void refreshCacheInfo(next.repo)
   }
@@ -114,9 +112,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
 
   const handleClearCache = async () => {
     if (
-      !confirm(
-        '确定清除 IndexedDB 中的提示词列表与效果图缓存？下次将重新从 GitHub 拉取。',
-      )
+      !confirm('确定清除本地缓存？下次将重新从 GitHub 拉取。')
     ) {
       return
     }
@@ -126,7 +122,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
     try {
       await clearAllLocalCache()
       clearImageCache()
-      setMsg('已清除本地 IndexedDB 缓存（PAT / 仓库设置保留）')
+      setMsg('已清除本地缓存（设置保留）')
       await refreshCacheInfo(saved.repo)
     } catch (e) {
       setErr(friendlyGithubError(e))
@@ -167,20 +163,7 @@ export function SettingsPage({ settings, onSaved }: Props) {
 
       <section className="settings-card">
         <h2>GitHub BYOK</h2>
-        <p className="hint">
-          PAT 与仓库仅保存在本机 <code>localStorage</code>（
-          <code>{KEY_TOKEN}</code> / <code>{KEY_REPO}</code>
-          ），不会写入任何代码或提交。需要权限：
-          <strong>Contents: Read</strong>（经典 token 勾选 <code>repo</code>
-          以读私有数据仓）。可 Settings 填写，也可事先写入
-          localStorage；启动会自动读。
-        </p>
-        <p className="hint muted">
-          数据文件默认读取仓库中的{' '}
-          <code>data/data_all_prompts.json</code>（分支{' '}
-          <code>master</code>）。仓库填写单个{' '}
-          <code>{REPO_PLACEHOLDER}</code>。
-        </p>
+        <p className="hint">密钥只存在本机浏览器，不会写入代码或提交。</p>
 
         <hr className="settings-divider" />
 
@@ -237,15 +220,12 @@ export function SettingsPage({ settings, onSaved }: Props) {
       </section>
 
       <section className="settings-card" style={{ marginTop: '1.15rem' }}>
-        <h2>本地缓存（IndexedDB）</h2>
+        <h2>本地缓存</h2>
         <p className="hint">
-          提示词列表、效果图 blob 与精选旁路（
-          <code>data/prompt_featured.json</code>
-          ）缓存在 IndexedDB（库名 <code>infoflow-web</code>
-          ）。启动先展示缓存再后台同步。PAT 不写入 IndexedDB。
+          列表与效果图缓存在本地，可清除后回首页重新拉取。
         </p>
         <p className="hint muted">
-          当前状态：<strong>{cacheInfo}</strong>
+          当前：<strong>{cacheInfo}</strong>
         </p>
         <div className="settings-actions">
           <button
@@ -261,9 +241,6 @@ export function SettingsPage({ settings, onSaved }: Props) {
             回首页强制刷新
           </Link>
         </div>
-        <p className="hint muted" style={{ marginTop: '0.75rem' }}>
-          或在首页点击「强制刷新」。清除缓存后返回首页会自动重新拉取。
-        </p>
       </section>
     </div>
   )
