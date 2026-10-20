@@ -3,6 +3,7 @@ import type { GithubSettings } from '../github/types'
 import { usePromptImages } from '../hooks/usePromptImages'
 import type { PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
+import { countTierClass } from '../utils/countTier'
 import { TagCapsule } from './TagCapsule'
 
 interface Props {
@@ -105,7 +106,9 @@ export function PromptDetailModal({
               )}
 
               {count > 0 && (
-                <span className="cover-badge detail-badge">
+                <span
+                  className={`cover-badge detail-badge ${countTierClass(count)}`}
+                >
                   {index + 1}/{count}
                 </span>
               )}
