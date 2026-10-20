@@ -20,6 +20,18 @@ import { useSelectedPrompts } from '../hooks/useSelectedPrompts'
 import { getPromptsCache } from '../idb/cache'
 import { promptImageCount, promptMonth, type PromptItem } from '../types/prompt'
 
+const FILTERS_OPEN_KEY = 'infoflow-home-filters-open'
+
+function readFiltersOpen(): boolean {
+  try {
+    const v = localStorage.getItem(FILTERS_OPEN_KEY)
+    if (v == null) return true
+    return v === '1' || v === 'true'
+  } catch {
+    return true
+  }
+}
+
 interface Props {
   settings: GithubSettings
 }
@@ -55,6 +67,7 @@ export function HomePage({ settings }: Props) {
   /** null = use full data range (avoids filtering before bounds sync). */
   const [countMax, setCountMax] = useState<number | null>(null)
   const [onlyFeatured, setOnlyFeatured] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(readFiltersOpen)
   const [detailPrompt, setDetailPrompt] = useState<PromptItem | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
@@ -172,6 +185,14 @@ export function HomePage({ settings }: Props) {
     [settings, pushToast],
   )
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTERS_OPEN_KEY, filtersOpen ? '1' : '0')
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [filtersOpen])
+
   const forceFlag = searchParams.get('force') === '1'
 
   useEffect(() => {
@@ -285,14 +306,6 @@ export function HomePage({ settings }: Props) {
           <div className="header-actions">
             <button
               type="button"
-              className={`btn sm filter-toggle${onlyFeatured ? ' primary' : ''}`}
-              onClick={() => setOnlyFeatured((v) => !v)}
-              aria-pressed={onlyFeatured}
-            >
-              ★ 精选
-            </button>
-            <button
-              type="button"
               className={`btn sm filter-toggle${selectMode ? ' primary' : ''}`}
               onClick={() => setSelectMode((v) => !v)}
               aria-pressed={selectMode}
@@ -326,31 +339,78 @@ export function HomePage({ settings }: Props) {
           </div>
         </header>
 
-        <div className="toolbar">
+        <div className="toolbar search-toolbar">
           <SearchBar
             value={query}
             onChange={setQuery}
             count={sorted.length}
             total={prompts.length}
           />
-          <ImageCountFilter
-            boundMin={imageCountBoundMin}
-            boundMax={imageCountBoundMax}
-            valueMin={countMin}
-            valueMax={effectiveCountMax}
-            onChange={(lo, hi) => {
-              setCountMin(lo)
-              setCountMax(hi)
-            }}
-          />
+          {!filtersOpen && (
+            <button
+              type="button"
+              className={`btn sm home-filters-toggle${onlyFeatured || replyKeywords.length > 0 ? '' : ' ghost'}`}
+              onClick={() => setFiltersOpen(true)}
+              aria-expanded={false}
+              aria-controls="home-filters-panel"
+              title="展开筛选（精选 / 张数 / 口令）"
+            >
+              筛选
+              {(onlyFeatured || replyKeywords.length > 0) && (
+                <span className="filters-active-dot" aria-hidden />
+              )}
+              <span className="home-filters-chevron" aria-hidden>
+                ▾
+              </span>
+            </button>
+          )}
         </div>
 
-        <KeywordFilter
-          keywords={topReplyKeywords}
-          selected={replyKeywords}
-          onToggle={toggleReplyKeyword}
-          onClear={() => setReplyKeywords([])}
-        />
+        {filtersOpen && (
+          <div className="home-filters is-open" id="home-filters-panel">
+            <div className="home-filters-bar">
+              <button
+                type="button"
+                className={`btn sm filter-toggle${onlyFeatured ? ' primary' : ''}`}
+                onClick={() => setOnlyFeatured((v) => !v)}
+                aria-pressed={onlyFeatured}
+                title="只看精选提示词"
+              >
+                ★ 精选
+              </button>
+              <button
+                type="button"
+                className="btn sm ghost home-filters-toggle"
+                onClick={() => setFiltersOpen(false)}
+                aria-expanded={true}
+                title="收起筛选"
+              >
+                收起
+                <span className="home-filters-chevron" aria-hidden>
+                  ▴
+                </span>
+              </button>
+            </div>
+            <div className="home-filters-body" id="home-filters-body">
+              <ImageCountFilter
+                boundMin={imageCountBoundMin}
+                boundMax={imageCountBoundMax}
+                valueMin={countMin}
+                valueMax={effectiveCountMax}
+                onChange={(lo, hi) => {
+                  setCountMin(Math.max(1, lo))
+                  setCountMax(hi)
+                }}
+              />
+              <KeywordFilter
+                keywords={topReplyKeywords}
+                selected={replyKeywords}
+                onToggle={toggleReplyKeyword}
+                onClear={() => setReplyKeywords([])}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="home-body">

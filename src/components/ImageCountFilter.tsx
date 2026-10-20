@@ -19,26 +19,31 @@ export function ImageCountFilter({
   valueMax,
   onChange,
 }: Props) {
-  if (boundMax <= boundMin) return null
+  const loBound = Math.max(1, boundMin)
+  const hiBound = Math.max(loBound, boundMax)
+  if (hiBound <= loBound) return null
 
-  const span = boundMax - boundMin || 1
-  const leftPct = ((valueMin - boundMin) / span) * 100
-  const rightPct = ((valueMax - boundMin) / span) * 100
+  const lo = Math.min(Math.max(valueMin, loBound), hiBound)
+  const hi = Math.min(Math.max(valueMax, lo), hiBound)
+
+  const span = hiBound - loBound || 1
+  const leftPct = ((lo - loBound) / span) * 100
+  const rightPct = ((hi - loBound) / span) * 100
 
   const setMin = (raw: number) => {
-    const next = Math.min(raw, valueMax)
-    onChange(next, valueMax)
+    const next = Math.min(Math.max(raw, loBound), hi)
+    onChange(next, hi)
   }
   const setMax = (raw: number) => {
-    const next = Math.max(raw, valueMin)
-    onChange(valueMin, next)
+    const next = Math.max(Math.min(raw, hiBound), lo)
+    onChange(lo, next)
   }
 
   return (
     <div className="image-count-filter" aria-label="按效果图张数筛选">
       <span className="icf-label">张数</span>
       <span className="icf-val" aria-hidden>
-        {valueMin}
+        {lo}
       </span>
       <div className="icf-slider">
         <div className="icf-track" aria-hidden>
@@ -50,26 +55,26 @@ export function ImageCountFilter({
         <input
           type="range"
           className="icf-thumb icf-thumb-min"
-          min={boundMin}
-          max={boundMax}
+          min={loBound}
+          max={hiBound}
           step={1}
-          value={valueMin}
+          value={lo}
           onChange={(e) => setMin(Number(e.target.value))}
           aria-label="最少张数"
         />
         <input
           type="range"
           className="icf-thumb icf-thumb-max"
-          min={boundMin}
-          max={boundMax}
+          min={loBound}
+          max={hiBound}
           step={1}
-          value={valueMax}
+          value={hi}
           onChange={(e) => setMax(Number(e.target.value))}
           aria-label="最多张数"
         />
       </div>
       <span className="icf-val" aria-hidden>
-        {valueMax}
+        {hi}
       </span>
     </div>
   )
