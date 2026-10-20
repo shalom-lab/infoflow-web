@@ -85,3 +85,12 @@ export function knownImageRepoPaths(
   }
   return null
 }
+
+/** YYYY-MM from savedAt, or prompt_id time prefix as fallback. */
+export function promptMonth(p: PromptItem): string | null {
+  const fromSaved = String(p.savedAt ?? '').match(/^(\d{4}-\d{2})/)
+  if (fromSaved) return fromSaved[1]
+  const fromId = String(p.prompt_id ?? '').match(/^(\d{4}-\d{2})/)
+  if (fromId) return fromId[1]
+  return null
+}

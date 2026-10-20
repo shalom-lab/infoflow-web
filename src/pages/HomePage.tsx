@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { KeywordFilter } from '../components/KeywordFilter'
+import { MonthFilter } from '../components/MonthFilter'
 import { PromptCard } from '../components/PromptCard'
 import { PromptDetailModal } from '../components/PromptDetailModal'
 import { SearchBar } from '../components/SearchBar'
@@ -16,7 +17,7 @@ import { friendlyGithubError, type GithubSettings } from '../github/types'
 import { useFeatured } from '../hooks/useFeatured'
 import { useSelectedPrompts } from '../hooks/useSelectedPrompts'
 import { getPromptsCache } from '../idb/cache'
-import type { PromptItem } from '../types/prompt'
+import { promptMonth, type PromptItem } from '../types/prompt'
 
 interface Props {
   settings: GithubSettings
@@ -48,6 +49,7 @@ export function HomePage({ settings }: Props) {
   const [demoMode, setDemoMode] = useState(false)
   const [query, setQuery] = useState('')
   const [keyword, setKeyword] = useState<string | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [onlyFeatured, setOnlyFeatured] = useState(false)
   const [detailPrompt, setDetailPrompt] = useState<PromptItem | null>(null)
   const [selectMode, setSelectMode] = useState(false)
@@ -191,13 +193,23 @@ export function HomePage({ settings }: Props) {
       .map(([k]) => k)
   }, [prompts])
 
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of prompts) {
+      const m = promptMonth(p)
+      if (m) set.add(m)
+    }
+    return [...set].sort((a, b) => b.localeCompare(a))
+  }, [prompts])
+
   const filtered = useMemo(() => {
     return prompts.filter((p) => {
       if (onlyFeatured && !isFeatured(p.prompt_id)) return false
+      if (selectedMonth && promptMonth(p) !== selectedMonth) return false
       if (keyword && !p.keywords.includes(keyword)) return false
       return matchesQuery(p, query)
     })
-  }, [prompts, query, keyword, onlyFeatured, isFeatured])
+  }, [prompts, query, keyword, selectedMonth, onlyFeatured, isFeatured])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -281,6 +293,13 @@ export function HomePage({ settings }: Props) {
         />
       </div>
 
+      <div className="home-body">
+        <MonthFilter
+          months={availableMonths}
+          selected={selectedMonth}
+          onSelect={setSelectedMonth}
+        />
+        <div className="home-main">
       {!configured && (
         <div className="banner warn setup-banner compact-banner">
           <div>
@@ -328,6 +347,8 @@ export function HomePage({ settings }: Props) {
           ))}
         </div>
       )}
+        </div>
+      </div>
 
       {detailPrompt && !selectMode && (
         <PromptDetailModal
