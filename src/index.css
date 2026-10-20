@@ -1051,6 +1051,14 @@ strong {
   overflow: hidden;
 }
 
+.card-month {
+  margin: -0.15rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--text-faint);
+  font-weight: 450;
+}
+
 .card-tags {
   display: flex;
   flex-wrap: wrap;

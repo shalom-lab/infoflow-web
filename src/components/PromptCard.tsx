@@ -1,7 +1,8 @@
 import { useState, type MouseEvent } from 'react'
 import type { GithubSettings } from '../github/types'
-import type { PromptItem } from '../types/prompt'
+import { promptMonth, type PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
+import { formatMonthLabel } from './MonthFilter'
 import { PromptCover } from './PromptCover'
 import { TagCapsule } from './TagCapsule'
 
@@ -34,6 +35,8 @@ export function PromptCard({
 }: Props) {
   const [copied, setCopied] = useState(false)
   const title = prompt.wechat_title || prompt.reply_keyword || '(无标题)'
+  const monthYm = promptMonth(prompt)
+  const monthLabel = monthYm ? formatMonthLabel(monthYm) : null
 
   const handleCopy = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -137,6 +140,12 @@ export function PromptCard({
         <h3 className="card-title" title={title}>
           {title}
         </h3>
+
+        {monthLabel && monthYm && (
+          <time className="card-month" dateTime={monthYm}>
+            {monthLabel}
+          </time>
+        )}
 
         {prompt.keywords.length > 0 && (
           <div className="card-tags">
