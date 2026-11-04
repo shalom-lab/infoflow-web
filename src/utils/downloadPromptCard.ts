@@ -263,7 +263,7 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /**
- * Draw a light prompt card on canvas and download as PNG.
+ * Draw a light prompt card on canvas and download as JPEG.
  *
  * Layout:
  *  1) Top row: reply_keyword (left purple) + wechat_title tag (right)
@@ -411,12 +411,13 @@ export async function downloadPromptCard(
     y += bodyLineH
   }
 
-  const filename = `${buildFilename(replyKeyword)}.png`
+  const filename = `${buildFilename(replyKeyword)}.jpg`
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error('生成图片失败'))),
-      'image/png',
+      'image/jpeg',
+      0.92,
     )
   })
 
