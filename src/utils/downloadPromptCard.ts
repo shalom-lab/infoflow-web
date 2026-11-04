@@ -1,44 +1,50 @@
-/** Render prompt text as a shareable PNG card and trigger browser download. */
+/** Render prompt text as a shareable JPEG card matching the 图美AI sample layout. */
 
-const CTA = '更多提示词 请关注 图美AI 公众号自动获取'
 const CARD_WIDTH = 900
 const PAD_X = 48
-const PAD_TOP = 36
+const PAD_TOP = 40
 const PAD_BOTTOM = 48
-const CTA_SIZE = 26
-const BODY_SIZE = 18
-const LINE_GAP = 8
-const DASH_GAP = 18
-const ROW_GAP = 18
-const PILL_FONT = 16
+const BODY_SIZE = 17
+const LINE_GAP = 7
+const TITLE_SIZE = 34
+const CTA_SIZE = 16
+const ROW_GAP = 22
+const PILL_FONT = 15
 const PILL_PAD_X = 14
 const PILL_PAD_Y = 7
 const PILL_GAP = 10
 const PILL_ROW_GAP = 10
-const TOP_PILL_FONT = 17
-const TOP_PILL_PAD_X = 16
-const TOP_PILL_PAD_Y = 8
-/** Light lavender fill / purple border+text matching app reply_keyword chip */
-const PILL_BG = '#eeecfb'
-const PILL_BORDER = '#5b4fcf'
-const PILL_TEXT = '#5b4fcf'
-/** Softer chip for wechat_title / tag on the top-right */
-const TAG_BG = '#f3f1ec'
-const TAG_BORDER = '#c8c3b8'
-const TAG_TEXT = '#3a3a42'
+const RELAY_FONT = 18
+const RELAY_PAD_X = 20
+const RELAY_PAD_Y = 10
+const PROMPT_LABEL_FONT = 14
+const PROMPT_LABEL_PAD_X = 12
+const PROMPT_LABEL_PAD_Y = 6
+
+const PURPLE = '#5b4fcf'
+const PURPLE_SOFT = '#eeecfb'
+const PURPLE_SOFT_BORDER = '#cfc8f0'
+const PURPLE_TEXT = '#4a3fbb'
+const CTA_TEXT = '#3d3a6b'
+const BODY_TEXT = '#2a2a32'
+const TITLE_TEXT = '#1a1a1f'
+const BORDER = '#d4c4e8'
+const DIVIDER = '#d8d0f0'
+
 const FONT_STACK =
   '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif'
 
+const CTA_BEFORE = '更多提示词 请关注 '
+const CTA_BRAND = '图美AI'
+const CTA_AFTER = ' 公众号自动获取'
+
 export type PromptCardOptions = {
   content: string
-  /** reply_keyword — top-left purple chip; also used for filename */
+  /** reply_keyword — top-left solid purple chip; also used for filename */
   replyKeyword?: string
-  /**
-   * Category/title tag for top-right (wechat_title — not the keywords list).
-   * Schema has no separate `tag` field.
-   */
-  tag?: string
-  /** keywords[] — purple pills below the dashed line */
+  /** wechat_title — bold title under the top row */
+  title?: string
+  /** keywords[] — soft purple pills under the title */
   keywords?: string[]
 }
 
@@ -77,7 +83,6 @@ function sanitizeFilenamePart(raw: string): string {
     .trim()
 }
 
-/** Filename = reply_keyword (relay word); filesystem-safe Chinese OK. */
 function buildFilename(replyKeyword: string): string {
   const cleaned = sanitizeFilenamePart(replyKeyword)
   return cleaned || '提示词-图美AI'
@@ -112,12 +117,6 @@ function roundRect(
   ctx.arcTo(x, y + h, x, y, radius)
   ctx.arcTo(x, y, x + w, y, radius)
   ctx.closePath()
-}
-
-type PillStyle = {
-  bg: string
-  border: string
-  text: string
 }
 
 type PillLayout = {
@@ -159,24 +158,27 @@ function measurePill(
   }
 }
 
-function drawOnePill(
+function drawFilledPill(
   ctx: CanvasRenderingContext2D,
   pill: PillLayout,
   x: number,
   y: number,
   fontSize: number,
   padX: number,
-  style: PillStyle,
+  bg: string,
+  fg: string,
+  border?: string,
 ): void {
   roundRect(ctx, x, y, pill.width, pill.height, pill.height / 2)
-  ctx.fillStyle = style.bg
+  ctx.fillStyle = bg
   ctx.fill()
-  ctx.strokeStyle = style.border
-  ctx.lineWidth = 1.5
-  ctx.stroke()
-
+  if (border) {
+    ctx.strokeStyle = border
+    ctx.lineWidth = 1.25
+    ctx.stroke()
+  }
   ctx.font = `600 ${fontSize}px ${FONT_STACK}`
-  ctx.fillStyle = style.text
+  ctx.fillStyle = fg
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
   ctx.fillText(pill.text, x + padX, y + pill.height / 2)
@@ -223,31 +225,87 @@ function layoutPills(
   return { rows, height, pillH }
 }
 
-function drawPills(
+function drawKeywordPills(
   ctx: CanvasRenderingContext2D,
   rows: PillRow[],
   startY: number,
-  pillH: number,
-  contentLeft: number,
-  contentWidth: number,
+  left: number,
 ): void {
-  ctx.font = `600 ${PILL_FONT}px ${FONT_STACK}`
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-
   let y = startY
   for (const row of rows) {
-    let x = contentLeft + Math.max(0, (contentWidth - row.width) / 2)
+    let x = left
     for (const pill of row.pills) {
-      drawOnePill(ctx, pill, x, y, PILL_FONT, PILL_PAD_X, {
-        bg: PILL_BG,
-        border: PILL_BORDER,
-        text: PILL_TEXT,
-      })
+      drawFilledPill(
+        ctx,
+        pill,
+        x,
+        y,
+        PILL_FONT,
+        PILL_PAD_X,
+        PURPLE_SOFT,
+        PURPLE_TEXT,
+        PURPLE_SOFT_BORDER,
+      )
       x += pill.width + PILL_GAP
     }
-    y += pillH + PILL_ROW_GAP
+    y += row.pills[0].height + PILL_ROW_GAP
   }
+}
+
+/** Right-aligned CTA with 图美AI highlighted in a purple badge. */
+function measureCta(ctx: CanvasRenderingContext2D): {
+  width: number
+  height: number
+  brandW: number
+  brandH: number
+  beforeW: number
+  afterW: number
+} {
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  const beforeW = ctx.measureText(CTA_BEFORE).width
+  const afterW = ctx.measureText(CTA_AFTER).width
+  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
+  const brandTw = ctx.measureText(CTA_BRAND).width
+  const brandPadX = 8
+  const brandPadY = 4
+  const brandW = brandTw + brandPadX * 2
+  const brandH = CTA_SIZE + brandPadY * 2
+  const width = beforeW + brandW + afterW
+  const height = Math.max(CTA_SIZE + 4, brandH)
+  return { width, height, brandW, brandH, beforeW, afterW }
+}
+
+function drawCta(
+  ctx: CanvasRenderingContext2D,
+  right: number,
+  midY: number,
+  metrics: ReturnType<typeof measureCta>,
+): void {
+  const startX = right - metrics.width
+  const baseline = midY
+
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = CTA_TEXT
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(CTA_BEFORE, startX, baseline)
+
+  const brandX = startX + metrics.beforeW
+  const brandY = baseline - metrics.brandH / 2
+  // Slightly rounded rect (not full pill) for brand badge
+  roundRect(ctx, brandX, brandY, metrics.brandW, metrics.brandH, 6)
+  ctx.fillStyle = PURPLE
+  ctx.fill()
+
+  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = '#ffffff'
+  ctx.textAlign = 'center'
+  ctx.fillText(CTA_BRAND, brandX + metrics.brandW / 2, baseline)
+
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = CTA_TEXT
+  ctx.textAlign = 'left'
+  ctx.fillText(CTA_AFTER, brandX + metrics.brandW, baseline)
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -265,19 +323,19 @@ function triggerDownload(blob: Blob, filename: string): void {
 /**
  * Draw a light prompt card on canvas and download as JPEG.
  *
- * Layout:
- *  1) Top row: reply_keyword (left purple) + wechat_title tag (right)
- *  2) CTA follow-account line
- *  3) Dashed divider
- *  4) keywords pills (if any)
- *  5) Prompt body
+ * Sample layout:
+ *  1) Top row: solid purple reply_keyword (left) + CTA with 图美AI badge (right)
+ *  2) Bold wechat_title
+ *  3) Soft keyword pills
+ *  4) Divider
+ *  5) 「Prompt」 label + prompt body
  */
 export async function downloadPromptCard(
   options: PromptCardOptions,
 ): Promise<void> {
   const content = options.content ?? ''
   const replyKeyword = (options.replyKeyword ?? '').trim()
-  const tag = (options.tag ?? '').trim()
+  const title = (options.title ?? '').trim()
   const keywords = uniqueNonEmpty(options.keywords).filter(
     (k) => k !== replyKeyword,
   )
@@ -287,53 +345,59 @@ export async function downloadPromptCard(
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('Canvas 不可用')
 
-  // Top row pills (each may take up to ~48% so they don't collide)
-  const topMaxEach = Math.floor(textWidth * 0.48)
-  const topPillH = TOP_PILL_FONT + TOP_PILL_PAD_Y * 2
-  const leftPill = replyKeyword
+  const ctaMetrics = measureCta(measure)
+  const relayMax = Math.floor(textWidth - ctaMetrics.width - 24)
+  const relayPill = replyKeyword
     ? measurePill(
         measure,
         replyKeyword,
-        TOP_PILL_FONT,
-        TOP_PILL_PAD_X,
-        TOP_PILL_PAD_Y,
-        topMaxEach,
+        RELAY_FONT,
+        RELAY_PAD_X,
+        RELAY_PAD_Y,
+        Math.max(80, relayMax),
       )
     : null
-  const rightPill = tag
-    ? measurePill(
-        measure,
-        tag,
-        TOP_PILL_FONT,
-        TOP_PILL_PAD_X,
-        TOP_PILL_PAD_Y,
-        topMaxEach,
-      )
-    : null
-  const topRowH = leftPill || rightPill ? topPillH : 0
+  const topRowH = Math.max(
+    relayPill?.height ?? 0,
+    ctaMetrics.height,
+    RELAY_FONT + RELAY_PAD_Y * 2,
+  )
 
-  measure.font = `600 ${CTA_SIZE}px ${FONT_STACK}`
-  const ctaLines = wrapLines(measure, CTA, textWidth)
-  const ctaLineH = CTA_SIZE + 6
-  const ctaBlockH = ctaLines.length * ctaLineH
+  measure.font = `700 ${TITLE_SIZE}px ${FONT_STACK}`
+  const titleLines = title ? wrapLines(measure, title, textWidth) : []
+  const titleLineH = TITLE_SIZE + 8
+  const titleBlockH = titleLines.length * titleLineH
+
+  const pillLayout = layoutPills(measure, keywords, textWidth)
+  const pillsBlockH = pillLayout.height
+
+  const promptLabel = measurePill(
+    measure,
+    'Prompt',
+    PROMPT_LABEL_FONT,
+    PROMPT_LABEL_PAD_X,
+    PROMPT_LABEL_PAD_Y,
+    200,
+  )
 
   measure.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   const bodyLines = wrapLines(measure, content, textWidth)
   const bodyLineH = BODY_SIZE + LINE_GAP
-
-  const afterTop = topRowH > 0 ? ROW_GAP : 0
-  const ctaStartY = PAD_TOP + topRowH + afterTop
-  const dashY = ctaStartY + ctaBlockH + DASH_GAP
-
-  const pillLayout = layoutPills(measure, keywords, textWidth)
-  const pillsBlockH = pillLayout.height
-  const afterDashGap = DASH_GAP + 4
-  const pillsStartY = dashY + afterDashGap
-  const betweenPillsAndBody = pillsBlockH > 0 ? 20 : 0
-  const bodyStartY =
-    pillsStartY + pillsBlockH + (pillsBlockH > 0 ? betweenPillsAndBody : 0)
   const bodyBlockH = Math.max(bodyLines.length, 1) * bodyLineH
-  const height = Math.ceil(bodyStartY + bodyBlockH + PAD_BOTTOM)
+
+  let yCursor = PAD_TOP + topRowH
+  yCursor += ROW_GAP
+  const titleStartY = yCursor
+  yCursor += titleBlockH > 0 ? titleBlockH + 16 : 0
+  const pillsStartY = yCursor
+  yCursor += pillsBlockH > 0 ? pillsBlockH + 20 : 0
+  const dividerY = yCursor
+  yCursor += 20
+  const promptLabelY = yCursor
+  yCursor += promptLabel.height + 14
+  const bodyStartY = yCursor
+  yCursor += bodyBlockH + PAD_BOTTOM
+  const height = Math.ceil(yCursor)
 
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(CARD_WIDTH * dpr)
@@ -343,76 +407,79 @@ export async function downloadPromptCard(
 
   ctx.scale(dpr, dpr)
 
+  // Background + soft purple outer border (sample style)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, CARD_WIDTH, height)
+  ctx.strokeStyle = BORDER
+  ctx.lineWidth = 2
+  ctx.strokeRect(1, 1, CARD_WIDTH - 2, height - 2)
 
-  ctx.strokeStyle = '#e8e4dc'
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, CARD_WIDTH - 1, height - 1)
-
-  // 1) Top row: relay left, tag right
-  if (leftPill) {
-    drawOnePill(ctx, leftPill, PAD_X, PAD_TOP, TOP_PILL_FONT, TOP_PILL_PAD_X, {
-      bg: PILL_BG,
-      border: PILL_BORDER,
-      text: PILL_TEXT,
-    })
-  }
-  if (rightPill) {
-    const rx = CARD_WIDTH - PAD_X - rightPill.width
-    drawOnePill(ctx, rightPill, rx, PAD_TOP, TOP_PILL_FONT, TOP_PILL_PAD_X, {
-      bg: TAG_BG,
-      border: TAG_BORDER,
-      text: TAG_TEXT,
-    })
-  }
-
-  // 2) CTA
-  ctx.fillStyle = '#1a1a1f'
-  ctx.font = `600 ${CTA_SIZE}px ${FONT_STACK}`
-  ctx.textBaseline = 'top'
-  ctx.textAlign = 'center'
-  let y = ctaStartY
-  for (const line of ctaLines) {
-    ctx.fillText(line, CARD_WIDTH / 2, y)
-    y += ctaLineH
-  }
-
-  // 3) Dashed divider
-  ctx.strokeStyle = '#c8c3b8'
-  ctx.lineWidth = 1.5
-  ctx.setLineDash([8, 7])
-  ctx.beginPath()
-  ctx.moveTo(PAD_X, dashY)
-  ctx.lineTo(CARD_WIDTH - PAD_X, dashY)
-  ctx.stroke()
-  ctx.setLineDash([])
-
-  // 4) Keyword pills
-  if (pillLayout.rows.length > 0) {
-    drawPills(
+  // 1) Top row: relay left + CTA right (same line)
+  const topMidY = PAD_TOP + topRowH / 2
+  if (relayPill) {
+    drawFilledPill(
       ctx,
-      pillLayout.rows,
-      pillsStartY,
-      pillLayout.pillH,
+      relayPill,
       PAD_X,
-      textWidth,
+      PAD_TOP + (topRowH - relayPill.height) / 2,
+      RELAY_FONT,
+      RELAY_PAD_X,
+      PURPLE,
+      '#ffffff',
     )
   }
+  drawCta(ctx, CARD_WIDTH - PAD_X, topMidY, ctaMetrics)
 
-  // 5) Body
-  ctx.fillStyle = '#2a2a32'
+  // 2) Bold title
+  if (titleLines.length > 0) {
+    ctx.fillStyle = TITLE_TEXT
+    ctx.font = `700 ${TITLE_SIZE}px ${FONT_STACK}`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    let ty = titleStartY
+    for (const line of titleLines) {
+      ctx.fillText(line, PAD_X, ty)
+      ty += titleLineH
+    }
+  }
+
+  // 3) Keyword pills (left-aligned)
+  if (pillLayout.rows.length > 0) {
+    drawKeywordPills(ctx, pillLayout.rows, pillsStartY, PAD_X)
+  }
+
+  // 4) Divider
+  ctx.strokeStyle = DIVIDER
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(PAD_X, dividerY)
+  ctx.lineTo(CARD_WIDTH - PAD_X, dividerY)
+  ctx.stroke()
+
+  // 5) Prompt label + body
+  drawFilledPill(
+    ctx,
+    promptLabel,
+    PAD_X,
+    promptLabelY,
+    PROMPT_LABEL_FONT,
+    PROMPT_LABEL_PAD_X,
+    PURPLE_SOFT,
+    PURPLE_TEXT,
+    PURPLE_SOFT_BORDER,
+  )
+
+  ctx.fillStyle = BODY_TEXT
   ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  y = bodyStartY
+  let by = bodyStartY
   for (const line of bodyLines) {
-    ctx.fillText(line, PAD_X, y)
-    y += bodyLineH
+    ctx.fillText(line, PAD_X, by)
+    by += bodyLineH
   }
 
   const filename = `${buildFilename(replyKeyword)}.jpg`
-
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error('生成图片失败'))),

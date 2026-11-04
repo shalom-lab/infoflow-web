@@ -132,8 +132,7 @@ export function PromptDetailModal({
       await downloadPromptCard({
         content: prompt.content,
         replyKeyword: replyKeyword || undefined,
-        // Schema has no separate `tag`; wechat_title is the category/title tag.
-        tag: prompt.wechat_title?.trim() || undefined,
+        title: prompt.wechat_title?.trim() || undefined,
         keywords: prompt.keywords,
       })
       setDownloaded(true)
