@@ -52,21 +52,6 @@ function DownloadIcon() {
   )
 }
 
-/** Build pill labels for the download card: reply_keyword first, then keywords. */
-function relayWordsFor(prompt: PromptItem): string[] {
-  const out: string[] = []
-  const seen = new Set<string>()
-  const push = (raw: string | undefined) => {
-    const t = raw?.trim()
-    if (!t || seen.has(t)) return
-    seen.add(t)
-    out.push(t)
-  }
-  push(prompt.reply_keyword)
-  for (const kw of prompt.keywords) push(kw)
-  return out
-}
-
 export function PromptDetailModal({
   prompt,
   settings,
@@ -146,8 +131,10 @@ export function PromptDetailModal({
     try {
       await downloadPromptCard({
         content: prompt.content,
-        title: title === '(无标题)' ? '提示词-图美AI' : title,
-        relayWords: relayWordsFor(prompt),
+        replyKeyword: replyKeyword || undefined,
+        // Schema has no separate `tag`; wechat_title is the category/title tag.
+        tag: prompt.wechat_title?.trim() || undefined,
+        keywords: prompt.keywords,
       })
       setDownloaded(true)
       window.setTimeout(() => setDownloaded(false), 1800)

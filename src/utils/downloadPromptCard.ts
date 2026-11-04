@@ -1,35 +1,45 @@
 /** Render prompt text as a shareable PNG card and trigger browser download. */
 
-const HEADER = '更多提示词 请关注 图美AI 公众号自动获取'
+const CTA = '更多提示词 请关注 图美AI 公众号自动获取'
 const CARD_WIDTH = 900
 const PAD_X = 48
-const PAD_TOP = 44
+const PAD_TOP = 36
 const PAD_BOTTOM = 48
-const HEADER_SIZE = 28
+const CTA_SIZE = 26
 const BODY_SIZE = 18
 const LINE_GAP = 8
 const DASH_GAP = 18
+const ROW_GAP = 18
 const PILL_FONT = 16
 const PILL_PAD_X = 14
 const PILL_PAD_Y = 7
 const PILL_GAP = 10
 const PILL_ROW_GAP = 10
+const TOP_PILL_FONT = 17
+const TOP_PILL_PAD_X = 16
+const TOP_PILL_PAD_Y = 8
 /** Light lavender fill / purple border+text matching app reply_keyword chip */
 const PILL_BG = '#eeecfb'
 const PILL_BORDER = '#5b4fcf'
 const PILL_TEXT = '#5b4fcf'
+/** Softer chip for wechat_title / tag on the top-right */
+const TAG_BG = '#f3f1ec'
+const TAG_BORDER = '#c8c3b8'
+const TAG_TEXT = '#3a3a42'
 const FONT_STACK =
   '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif'
 
 export type PromptCardOptions = {
   content: string
-  /** Optional display/context title (filename uses relayWords only) */
-  title?: string
+  /** reply_keyword — top-left purple chip; also used for filename */
+  replyKeyword?: string
   /**
-   * Relay / reply keywords to draw as purple pills
-   * (typically `reply_keyword`, optionally plus `keywords`).
+   * Category/title tag for top-right (wechat_title — not the keywords list).
+   * Schema has no separate `tag` field.
    */
-  relayWords?: string[]
+  tag?: string
+  /** keywords[] — purple pills below the dashed line */
+  keywords?: string[]
 }
 
 function wrapLines(
@@ -67,32 +77,10 @@ function sanitizeFilenamePart(raw: string): string {
     .trim()
 }
 
-/** Filename = relay words only (reply_keyword first); filesystem-safe Chinese OK. */
-function buildFilename(relayWords: string[]): string {
-  const parts: string[] = []
-  const seen = new Set<string>()
-  for (const w of relayWords) {
-    const cleaned = sanitizeFilenamePart(w)
-    if (!cleaned || seen.has(cleaned)) continue
-    seen.add(cleaned)
-    parts.push(cleaned)
-  }
-  if (parts.length === 0) return '提示词-图美AI'
-
-  // Soft cap; keep earlier segments (reply_keyword first)
-  let name = parts.join('-')
-  if (name.length > 80) {
-    const kept: string[] = []
-    let len = 0
-    for (const p of parts) {
-      const next = kept.length === 0 ? p.length : len + 1 + p.length
-      if (kept.length > 0 && next > 80) break
-      kept.push(p)
-      len = next
-    }
-    name = kept.join('-') || parts[0].slice(0, 80)
-  }
-  return name
+/** Filename = reply_keyword (relay word); filesystem-safe Chinese OK. */
+function buildFilename(replyKeyword: string): string {
+  const cleaned = sanitizeFilenamePart(replyKeyword)
+  return cleaned || '提示词-图美AI'
 }
 
 function uniqueNonEmpty(words: string[] | undefined): string[] {
@@ -126,6 +114,12 @@ function roundRect(
   ctx.closePath()
 }
 
+type PillStyle = {
+  bg: string
+  border: string
+  text: string
+}
+
 type PillLayout = {
   text: string
   width: number
@@ -135,6 +129,57 @@ type PillLayout = {
 type PillRow = {
   pills: PillLayout[]
   width: number
+}
+
+function measurePill(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number,
+  padX: number,
+  padY: number,
+  maxWidth: number,
+): PillLayout {
+  ctx.font = `600 ${fontSize}px ${FONT_STACK}`
+  const pillH = fontSize + padY * 2
+  let label = text
+  let tw = ctx.measureText(label).width
+  const maxInner = Math.max(24, maxWidth - padX * 2)
+  if (tw > maxInner) {
+    const ell = '…'
+    while (label.length > 1 && ctx.measureText(label + ell).width > maxInner) {
+      label = label.slice(0, -1)
+    }
+    label = label + ell
+    tw = ctx.measureText(label).width
+  }
+  return {
+    text: label,
+    width: Math.ceil(tw + padX * 2),
+    height: pillH,
+  }
+}
+
+function drawOnePill(
+  ctx: CanvasRenderingContext2D,
+  pill: PillLayout,
+  x: number,
+  y: number,
+  fontSize: number,
+  padX: number,
+  style: PillStyle,
+): void {
+  roundRect(ctx, x, y, pill.width, pill.height, pill.height / 2)
+  ctx.fillStyle = style.bg
+  ctx.fill()
+  ctx.strokeStyle = style.border
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  ctx.font = `600 ${fontSize}px ${FONT_STACK}`
+  ctx.fillStyle = style.text
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(pill.text, x + padX, y + pill.height / 2)
 }
 
 function layoutPills(
@@ -192,18 +237,13 @@ function drawPills(
 
   let y = startY
   for (const row of rows) {
-    // Center each row within the content column
     let x = contentLeft + Math.max(0, (contentWidth - row.width) / 2)
     for (const pill of row.pills) {
-      roundRect(ctx, x, y, pill.width, pillH, pillH / 2)
-      ctx.fillStyle = PILL_BG
-      ctx.fill()
-      ctx.strokeStyle = PILL_BORDER
-      ctx.lineWidth = 1.5
-      ctx.stroke()
-
-      ctx.fillStyle = PILL_TEXT
-      ctx.fillText(pill.text, x + PILL_PAD_X, y + pillH / 2)
+      drawOnePill(ctx, pill, x, y, PILL_FONT, PILL_PAD_X, {
+        bg: PILL_BG,
+        border: PILL_BORDER,
+        text: PILL_TEXT,
+      })
       x += pill.width + PILL_GAP
     }
     y += pillH + PILL_ROW_GAP
@@ -224,31 +264,68 @@ function triggerDownload(blob: Blob, filename: string): void {
 
 /**
  * Draw a light prompt card on canvas and download as PNG.
- * Uses devicePixelRatio for crisp text on HiDPI screens.
+ *
+ * Layout:
+ *  1) Top row: reply_keyword (left purple) + wechat_title tag (right)
+ *  2) CTA follow-account line
+ *  3) Dashed divider
+ *  4) keywords pills (if any)
+ *  5) Prompt body
  */
 export async function downloadPromptCard(
   options: PromptCardOptions,
 ): Promise<void> {
   const content = options.content ?? ''
-  const relayWords = uniqueNonEmpty(options.relayWords)
+  const replyKeyword = (options.replyKeyword ?? '').trim()
+  const tag = (options.tag ?? '').trim()
+  const keywords = uniqueNonEmpty(options.keywords).filter(
+    (k) => k !== replyKeyword,
+  )
   const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
   const textWidth = CARD_WIDTH - PAD_X * 2
 
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('Canvas 不可用')
 
-  measure.font = `600 ${HEADER_SIZE}px ${FONT_STACK}`
-  const headerLines = wrapLines(measure, HEADER, textWidth)
-  const headerLineH = HEADER_SIZE + 6
+  // Top row pills (each may take up to ~48% so they don't collide)
+  const topMaxEach = Math.floor(textWidth * 0.48)
+  const topPillH = TOP_PILL_FONT + TOP_PILL_PAD_Y * 2
+  const leftPill = replyKeyword
+    ? measurePill(
+        measure,
+        replyKeyword,
+        TOP_PILL_FONT,
+        TOP_PILL_PAD_X,
+        TOP_PILL_PAD_Y,
+        topMaxEach,
+      )
+    : null
+  const rightPill = tag
+    ? measurePill(
+        measure,
+        tag,
+        TOP_PILL_FONT,
+        TOP_PILL_PAD_X,
+        TOP_PILL_PAD_Y,
+        topMaxEach,
+      )
+    : null
+  const topRowH = leftPill || rightPill ? topPillH : 0
+
+  measure.font = `600 ${CTA_SIZE}px ${FONT_STACK}`
+  const ctaLines = wrapLines(measure, CTA, textWidth)
+  const ctaLineH = CTA_SIZE + 6
+  const ctaBlockH = ctaLines.length * ctaLineH
 
   measure.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   const bodyLines = wrapLines(measure, content, textWidth)
   const bodyLineH = BODY_SIZE + LINE_GAP
 
-  const headerBlockH = headerLines.length * headerLineH
-  const dashY = PAD_TOP + headerBlockH + DASH_GAP
+  const afterTop = topRowH > 0 ? ROW_GAP : 0
+  const ctaStartY = PAD_TOP + topRowH + afterTop
+  const dashY = ctaStartY + ctaBlockH + DASH_GAP
 
-  const pillLayout = layoutPills(measure, relayWords, textWidth)
+  const pillLayout = layoutPills(measure, keywords, textWidth)
   const pillsBlockH = pillLayout.height
   const afterDashGap = DASH_GAP + 4
   const pillsStartY = dashY + afterDashGap
@@ -273,18 +350,35 @@ export async function downloadPromptCard(
   ctx.lineWidth = 1
   ctx.strokeRect(0.5, 0.5, CARD_WIDTH - 1, height - 1)
 
-  // Header
-  ctx.fillStyle = '#1a1a1f'
-  ctx.font = `600 ${HEADER_SIZE}px ${FONT_STACK}`
-  ctx.textBaseline = 'top'
-  ctx.textAlign = 'center'
-  let y = PAD_TOP
-  for (const line of headerLines) {
-    ctx.fillText(line, CARD_WIDTH / 2, y)
-    y += headerLineH
+  // 1) Top row: relay left, tag right
+  if (leftPill) {
+    drawOnePill(ctx, leftPill, PAD_X, PAD_TOP, TOP_PILL_FONT, TOP_PILL_PAD_X, {
+      bg: PILL_BG,
+      border: PILL_BORDER,
+      text: PILL_TEXT,
+    })
+  }
+  if (rightPill) {
+    const rx = CARD_WIDTH - PAD_X - rightPill.width
+    drawOnePill(ctx, rightPill, rx, PAD_TOP, TOP_PILL_FONT, TOP_PILL_PAD_X, {
+      bg: TAG_BG,
+      border: TAG_BORDER,
+      text: TAG_TEXT,
+    })
   }
 
-  // Dashed divider
+  // 2) CTA
+  ctx.fillStyle = '#1a1a1f'
+  ctx.font = `600 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.textBaseline = 'top'
+  ctx.textAlign = 'center'
+  let y = ctaStartY
+  for (const line of ctaLines) {
+    ctx.fillText(line, CARD_WIDTH / 2, y)
+    y += ctaLineH
+  }
+
+  // 3) Dashed divider
   ctx.strokeStyle = '#c8c3b8'
   ctx.lineWidth = 1.5
   ctx.setLineDash([8, 7])
@@ -294,7 +388,7 @@ export async function downloadPromptCard(
   ctx.stroke()
   ctx.setLineDash([])
 
-  // Relay-word purple pills
+  // 4) Keyword pills
   if (pillLayout.rows.length > 0) {
     drawPills(
       ctx,
@@ -306,7 +400,7 @@ export async function downloadPromptCard(
     )
   }
 
-  // Body prompt text
+  // 5) Body
   ctx.fillStyle = '#2a2a32'
   ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   ctx.textAlign = 'left'
@@ -317,7 +411,7 @@ export async function downloadPromptCard(
     y += bodyLineH
   }
 
-  const filename = `${buildFilename(relayWords)}.png`
+  const filename = `${buildFilename(replyKeyword)}.png`
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
