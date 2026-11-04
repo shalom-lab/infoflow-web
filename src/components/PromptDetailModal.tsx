@@ -58,7 +58,7 @@ export function PromptDetailModal({
   imagesEnabled,
   onClose,
 }: Props) {
-  const { urls, count, status } = usePromptImages(
+  const { urls, count, status, coverUrl } = usePromptImages(
     prompt.prompt_id,
     settings,
     imagesEnabled,
@@ -134,6 +134,7 @@ export function PromptDetailModal({
         replyKeyword: replyKeyword || undefined,
         title: prompt.wechat_title?.trim() || undefined,
         keywords: prompt.keywords,
+        coverUrl: urls[0] ?? coverUrl ?? undefined,
       })
       setDownloaded(true)
       window.setTimeout(() => setDownloaded(false), 1800)

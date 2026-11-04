@@ -17,9 +17,9 @@ const PILL_ROW_GAP = 10
 const RELAY_FONT = 18
 const RELAY_PAD_X = 20
 const RELAY_PAD_Y = 10
-const PROMPT_LABEL_FONT = 14
-const PROMPT_LABEL_PAD_X = 12
-const PROMPT_LABEL_PAD_Y = 6
+const THUMB_SIZE = 92
+const THUMB_RADIUS = 14
+const THUMB_GAP = 16
 
 const PURPLE = '#5b4fcf'
 const PURPLE_SOFT = '#eeecfb'
@@ -40,12 +40,14 @@ const CTA_AFTER = ' 公众号自动获取'
 
 export type PromptCardOptions = {
   content: string
-  /** reply_keyword — top-left solid purple chip; also used for filename */
+  /** reply_keyword — solid purple chip; also used for filename */
   replyKeyword?: string
   /** wechat_title — bold title under the top row */
   title?: string
   /** keywords[] — soft purple pills under the title */
   keywords?: string[]
+  /** First/cover image object URL or https URL; skipped on load failure */
+  coverUrl?: string
 }
 
 function wrapLines(
@@ -74,6 +76,13 @@ function wrapLines(
     if (current) lines.push(current)
   }
   return lines
+}
+
+/** Drop a redundant leading "Prompt:" line/prefix from body text. */
+function normalizeBody(raw: string): string {
+  return raw
+    .replace(/^\uFEFF?Prompt\s*[:：]\s*/i, '')
+    .replace(/^\s+/, '')
 }
 
 function sanitizeFilenamePart(raw: string): string {
@@ -252,60 +261,228 @@ function drawKeywordPills(
   }
 }
 
-/** Right-aligned CTA with 图美AI highlighted in a purple badge. */
-function measureCta(ctx: CanvasRenderingContext2D): {
+type CtaLayout = {
+  /** single line, or wrap after brand, or wrap before brand */
+  mode: 'single' | 'wrap-after-brand' | 'wrap-before-brand'
   width: number
   height: number
   brandW: number
   brandH: number
   beforeW: number
   afterW: number
-} {
+  afterText: string
+  beforeText: string
+  lineH: number
+  lineGap: number
+}
+
+function layoutCta(
+  ctx: CanvasRenderingContext2D,
+  maxWidth: number,
+): CtaLayout {
+  const beforeText = CTA_BEFORE
+  const afterText = CTA_AFTER.trimStart() // drop leading space when alone on line 2
   ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
-  const beforeW = ctx.measureText(CTA_BEFORE).width
-  const afterW = ctx.measureText(CTA_AFTER).width
+  const beforeW = ctx.measureText(beforeText).width
+  const afterWFull = ctx.measureText(CTA_AFTER).width
+  const afterW = ctx.measureText(afterText).width
   ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
   const brandTw = ctx.measureText(CTA_BRAND).width
   const brandPadX = 8
   const brandPadY = 4
   const brandW = brandTw + brandPadX * 2
   const brandH = CTA_SIZE + brandPadY * 2
-  const width = beforeW + brandW + afterW
-  const height = Math.max(CTA_SIZE + 4, brandH)
-  return { width, height, brandW, brandH, beforeW, afterW }
+  const lineH = Math.max(CTA_SIZE + 4, brandH)
+  const lineGap = 5
+  const singleW = beforeW + brandW + afterWFull
+
+  if (singleW <= maxWidth) {
+    return {
+      mode: 'single',
+      width: singleW,
+      height: lineH,
+      brandW,
+      brandH,
+      beforeW,
+      afterW: afterWFull,
+      afterText: CTA_AFTER,
+      beforeText,
+      lineH,
+      lineGap,
+    }
+  }
+
+  // Prefer: line1 = before + brand; line2 = after
+  if (beforeW + brandW <= maxWidth) {
+    return {
+      mode: 'wrap-after-brand',
+      width: Math.max(beforeW + brandW, afterW),
+      height: lineH * 2 + lineGap,
+      brandW,
+      brandH,
+      beforeW,
+      afterW,
+      afterText,
+      beforeText,
+      lineH,
+      lineGap,
+    }
+  }
+
+  // Fallback: line1 = before; line2 = brand + after
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  const beforeTrim = beforeText.trimEnd()
+  const beforeTrimW = ctx.measureText(beforeTrim).width
+  return {
+    mode: 'wrap-before-brand',
+    width: Math.max(beforeTrimW, brandW + afterWFull),
+    height: lineH * 2 + lineGap,
+    brandW,
+    brandH,
+    beforeW: beforeTrimW,
+    afterW: afterWFull,
+    afterText: CTA_AFTER,
+    beforeText: beforeTrim,
+    lineH,
+    lineGap,
+  }
+}
+
+function drawBrandBadge(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  midY: number,
+  brandW: number,
+  brandH: number,
+): void {
+  const brandY = midY - brandH / 2
+  roundRect(ctx, x, brandY, brandW, brandH, 6)
+  ctx.fillStyle = PURPLE
+  ctx.fill()
+  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = '#ffffff'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(CTA_BRAND, x + brandW / 2, midY)
 }
 
 function drawCta(
   ctx: CanvasRenderingContext2D,
   right: number,
-  midY: number,
-  metrics: ReturnType<typeof measureCta>,
+  topY: number,
+  layout: CtaLayout,
 ): void {
-  const startX = right - metrics.width
-  const baseline = midY
+  ctx.fillStyle = CTA_TEXT
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
 
+  if (layout.mode === 'single') {
+    const startX = right - layout.width
+    const midY = topY + layout.height / 2
+    ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+    ctx.fillText(layout.beforeText, startX, midY)
+    drawBrandBadge(
+      ctx,
+      startX + layout.beforeW,
+      midY,
+      layout.brandW,
+      layout.brandH,
+    )
+    ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+    ctx.fillStyle = CTA_TEXT
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(
+      layout.afterText,
+      startX + layout.beforeW + layout.brandW,
+      midY,
+    )
+    return
+  }
+
+  if (layout.mode === 'wrap-after-brand') {
+    const line1W = layout.beforeW + layout.brandW
+    const line1X = right - line1W
+    const line1Mid = topY + layout.lineH / 2
+    ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+    ctx.fillText(layout.beforeText, line1X, line1Mid)
+    drawBrandBadge(
+      ctx,
+      line1X + layout.beforeW,
+      line1Mid,
+      layout.brandW,
+      layout.brandH,
+    )
+    const line2Mid = topY + layout.lineH + layout.lineGap + layout.lineH / 2
+    ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+    ctx.fillStyle = CTA_TEXT
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(layout.afterText, right - layout.afterW, line2Mid)
+    return
+  }
+
+  // wrap-before-brand
+  const line1X = right - layout.beforeW
+  const line1Mid = topY + layout.lineH / 2
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillText(layout.beforeText, line1X, line1Mid)
+  const line2W = layout.brandW + layout.afterW
+  const line2X = right - line2W
+  const line2Mid = topY + layout.lineH + layout.lineGap + layout.lineH / 2
+  drawBrandBadge(ctx, line2X, line2Mid, layout.brandW, layout.brandH)
   ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
   ctx.fillStyle = CTA_TEXT
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText(CTA_BEFORE, startX, baseline)
+  ctx.fillText(layout.afterText, line2X + layout.brandW, line2Mid)
+}
 
-  const brandX = startX + metrics.beforeW
-  const brandY = baseline - metrics.brandH / 2
-  // Slightly rounded rect (not full pill) for brand badge
-  roundRect(ctx, brandX, brandY, metrics.brandW, metrics.brandH, 6)
-  ctx.fillStyle = PURPLE
-  ctx.fill()
+async function loadCoverImage(
+  url: string | undefined,
+): Promise<HTMLImageElement | null> {
+  if (!url) return null
+  try {
+    const img = new Image()
+    if (!url.startsWith('blob:') && !url.startsWith('data:')) {
+      img.crossOrigin = 'anonymous'
+    }
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('cover load failed'))
+      img.src = url
+    })
+    if (!img.naturalWidth || !img.naturalHeight) return null
+    return img
+  } catch {
+    return null
+  }
+}
 
-  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
-  ctx.fillStyle = '#ffffff'
-  ctx.textAlign = 'center'
-  ctx.fillText(CTA_BRAND, brandX + metrics.brandW / 2, baseline)
-
-  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
-  ctx.fillStyle = CTA_TEXT
-  ctx.textAlign = 'left'
-  ctx.fillText(CTA_AFTER, brandX + metrics.brandW, baseline)
+/** Draw image with object-fit: cover into a rounded rect. */
+function drawCoverThumb(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  size: number,
+  radius: number,
+): void {
+  ctx.save()
+  roundRect(ctx, x, y, size, size, radius)
+  ctx.clip()
+  const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight)
+  const dw = img.naturalWidth * scale
+  const dh = img.naturalHeight * scale
+  const dx = x + (size - dw) / 2
+  const dy = y + (size - dh) / 2
+  ctx.drawImage(img, dx, dy, dw, dh)
+  ctx.restore()
+  // Soft border
+  roundRect(ctx, x, y, size, size, radius)
+  ctx.strokeStyle = PURPLE_SOFT_BORDER
+  ctx.lineWidth = 1.25
+  ctx.stroke()
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -323,30 +500,35 @@ function triggerDownload(blob: Blob, filename: string): void {
 /**
  * Draw a light prompt card on canvas and download as JPEG.
  *
- * Sample layout:
- *  1) Top row: solid purple reply_keyword (left) + CTA with 图美AI badge (right)
+ * Layout:
+ *  1) Top: cover thumb (left) + reply_keyword pill + CTA (right of thumb)
  *  2) Bold wechat_title
  *  3) Soft keyword pills
  *  4) Divider
- *  5) 「Prompt」 label + prompt body
+ *  5) Prompt body (no 「Prompt」 pill)
  */
 export async function downloadPromptCard(
   options: PromptCardOptions,
 ): Promise<void> {
-  const content = options.content ?? ''
+  const content = normalizeBody(options.content ?? '')
   const replyKeyword = (options.replyKeyword ?? '').trim()
   const title = (options.title ?? '').trim()
   const keywords = uniqueNonEmpty(options.keywords).filter(
     (k) => k !== replyKeyword,
   )
+  const coverImg = await loadCoverImage(options.coverUrl)
+  const hasThumb = coverImg != null
+
   const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
   const textWidth = CARD_WIDTH - PAD_X * 2
 
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('Canvas 不可用')
 
-  const ctaMetrics = measureCta(measure)
-  const relayMax = Math.floor(textWidth - ctaMetrics.width - 24)
+  const headerLeft = hasThumb ? PAD_X + THUMB_SIZE + THUMB_GAP : PAD_X
+  const headerWidth = CARD_WIDTH - PAD_X - headerLeft
+  const headerGap = 16
+  // Relay first (capped), then CTA wraps into remaining width
   const relayPill = replyKeyword
     ? measurePill(
         measure,
@@ -354,14 +536,19 @@ export async function downloadPromptCard(
         RELAY_FONT,
         RELAY_PAD_X,
         RELAY_PAD_Y,
-        Math.max(80, relayMax),
+        Math.max(72, Math.floor(headerWidth * 0.42)),
       )
     : null
-  const topRowH = Math.max(
+  const relayW = relayPill?.width ?? 0
+  const ctaMax = Math.max(160, headerWidth - relayW - headerGap)
+  const ctaLayout = layoutCta(measure, ctaMax)
+
+  const headerContentH = Math.max(
     relayPill?.height ?? 0,
-    ctaMetrics.height,
+    ctaLayout.height,
     RELAY_FONT + RELAY_PAD_Y * 2,
   )
+  const topRowH = hasThumb ? Math.max(THUMB_SIZE, headerContentH) : headerContentH
 
   measure.font = `700 ${TITLE_SIZE}px ${FONT_STACK}`
   const titleLines = title ? wrapLines(measure, title, textWidth) : []
@@ -370,15 +557,6 @@ export async function downloadPromptCard(
 
   const pillLayout = layoutPills(measure, keywords, textWidth)
   const pillsBlockH = pillLayout.height
-
-  const promptLabel = measurePill(
-    measure,
-    'Prompt',
-    PROMPT_LABEL_FONT,
-    PROMPT_LABEL_PAD_X,
-    PROMPT_LABEL_PAD_Y,
-    200,
-  )
 
   measure.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   const bodyLines = wrapLines(measure, content, textWidth)
@@ -393,8 +571,6 @@ export async function downloadPromptCard(
   yCursor += pillsBlockH > 0 ? pillsBlockH + 20 : 0
   const dividerY = yCursor
   yCursor += 20
-  const promptLabelY = yCursor
-  yCursor += promptLabel.height + 14
   const bodyStartY = yCursor
   yCursor += bodyBlockH + PAD_BOTTOM
   const height = Math.ceil(yCursor)
@@ -407,28 +583,37 @@ export async function downloadPromptCard(
 
   ctx.scale(dpr, dpr)
 
-  // Background + soft purple outer border (sample style)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, CARD_WIDTH, height)
   ctx.strokeStyle = BORDER
   ctx.lineWidth = 2
   ctx.strokeRect(1, 1, CARD_WIDTH - 2, height - 2)
 
-  // 1) Top row: relay left + CTA right (same line)
-  const topMidY = PAD_TOP + topRowH / 2
+  // 1) Top: optional cover thumb + relay + CTA
+  if (hasThumb && coverImg) {
+    drawCoverThumb(ctx, coverImg, PAD_X, PAD_TOP, THUMB_SIZE, THUMB_RADIUS)
+  }
+
+  const headerBandTop = PAD_TOP + (topRowH - headerContentH) / 2
+
   if (relayPill) {
     drawFilledPill(
       ctx,
       relayPill,
-      PAD_X,
-      PAD_TOP + (topRowH - relayPill.height) / 2,
+      headerLeft,
+      headerBandTop + (headerContentH - relayPill.height) / 2,
       RELAY_FONT,
       RELAY_PAD_X,
       PURPLE,
       '#ffffff',
     )
   }
-  drawCta(ctx, CARD_WIDTH - PAD_X, topMidY, ctaMetrics)
+  drawCta(
+    ctx,
+    CARD_WIDTH - PAD_X,
+    headerBandTop + (headerContentH - ctaLayout.height) / 2,
+    ctaLayout,
+  )
 
   // 2) Bold title
   if (titleLines.length > 0) {
@@ -443,7 +628,7 @@ export async function downloadPromptCard(
     }
   }
 
-  // 3) Keyword pills (left-aligned)
+  // 3) Keyword pills
   if (pillLayout.rows.length > 0) {
     drawKeywordPills(ctx, pillLayout.rows, pillsStartY, PAD_X)
   }
@@ -456,19 +641,7 @@ export async function downloadPromptCard(
   ctx.lineTo(CARD_WIDTH - PAD_X, dividerY)
   ctx.stroke()
 
-  // 5) Prompt label + body
-  drawFilledPill(
-    ctx,
-    promptLabel,
-    PAD_X,
-    promptLabelY,
-    PROMPT_LABEL_FONT,
-    PROMPT_LABEL_PAD_X,
-    PURPLE_SOFT,
-    PURPLE_TEXT,
-    PURPLE_SOFT_BORDER,
-  )
-
+  // 5) Body (no Prompt pill)
   ctx.fillStyle = BODY_TEXT
   ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   ctx.textAlign = 'left'
