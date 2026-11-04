@@ -3,6 +3,7 @@ import type { GithubSettings } from '../github/types'
 import { usePromptImages } from '../hooks/usePromptImages'
 import type { PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
+import { downloadPromptCard } from '../utils/downloadPromptCard'
 import { TagCapsule } from './TagCapsule'
 
 interface Props {
@@ -10,6 +11,26 @@ interface Props {
   settings: GithubSettings | null
   imagesEnabled: boolean
   onClose: () => void
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 3v12" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M5 19h14" />
+    </svg>
+  )
 }
 
 export function PromptDetailModal({
@@ -27,6 +48,8 @@ export function PromptDetailModal({
   const [index, setIndex] = useState(0)
   const [copied, setCopied] = useState(false)
   const [kwCopied, setKwCopied] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [downloaded, setDownloaded] = useState(false)
 
   const title = prompt.wechat_title || prompt.reply_keyword || '(无标题)'
   const replyKeyword = prompt.reply_keyword?.trim() || ''
@@ -36,6 +59,8 @@ export function PromptDetailModal({
     setIndex(0)
     setKwCopied(false)
     setCopied(false)
+    setDownloading(false)
+    setDownloaded(false)
   }, [prompt.prompt_id])
 
   useEffect(() => {
@@ -79,6 +104,30 @@ export function PromptDetailModal({
       window.setTimeout(() => setKwCopied(false), 1400)
     }
   }
+
+  const handleDownload = async () => {
+    if (downloading) return
+    setDownloading(true)
+    setDownloaded(false)
+    try {
+      await downloadPromptCard({
+        content: prompt.content,
+        title: title === '(无标题)' ? '提示词-图美AI' : title,
+      })
+      setDownloaded(true)
+      window.setTimeout(() => setDownloaded(false), 1800)
+    } catch {
+      // Keep silent in-modal; button returns to idle so user can retry
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const downloadLabel = downloading
+    ? '生成中…'
+    : downloaded
+      ? '已下载'
+      : '下载提示词图片'
 
   return (
     <div
@@ -153,7 +202,9 @@ export function PromptDetailModal({
                     className={`detail-reply-kw${kwCopied ? ' ok' : ''}`}
                     onClick={() => void handleCopyKeyword()}
                     title={kwCopied ? '已复制' : '点击复制口令'}
-                    aria-label={kwCopied ? '口令已复制' : `复制口令 ${replyKeyword}`}
+                    aria-label={
+                      kwCopied ? '口令已复制' : `复制口令 ${replyKeyword}`
+                    }
                   >
                     {kwCopied ? '已复制' : replyKeyword}
                   </button>
@@ -164,6 +215,18 @@ export function PromptDetailModal({
                   onClick={() => void handleCopy()}
                 >
                   {copied ? '已复制' : '复制提示词'}
+                </button>
+                <button
+                  type="button"
+                  className={`detail-download-btn${downloaded ? ' ok' : ''}${
+                    downloading ? ' busy' : ''
+                  }`}
+                  onClick={() => void handleDownload()}
+                  disabled={downloading}
+                  title={downloadLabel}
+                  aria-label={downloadLabel}
+                >
+                  {downloaded ? '✓' : <DownloadIcon />}
                 </button>
                 <button
                   type="button"

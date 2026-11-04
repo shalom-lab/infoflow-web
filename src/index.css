@@ -1670,6 +1670,40 @@ strong {
   white-space: nowrap;
 }
 
+.detail-download-btn {
+  flex-shrink: 0;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.detail-download-btn:hover:not(:disabled) {
+  background: var(--bg-muted);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.detail-download-btn:disabled,
+.detail-download-btn.busy {
+  opacity: 0.65;
+  cursor: wait;
+}
+.detail-download-btn.ok {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
+}
+
 .detail-title {
   margin: 0;
   flex: 1;
