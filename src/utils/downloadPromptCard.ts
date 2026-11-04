@@ -23,7 +23,7 @@ const FONT_STACK =
 
 export type PromptCardOptions = {
   content: string
-  /** Used to build a safe filename; falls back to 提示词-图美AI.png */
+  /** Optional display/context title (filename uses relayWords only) */
   title?: string
   /**
    * Relay / reply keywords to draw as purple pills
@@ -60,13 +60,39 @@ function wrapLines(
   return lines
 }
 
-function sanitizeFilename(raw: string): string {
-  const cleaned = raw
+function sanitizeFilenamePart(raw: string): string {
+  return raw
     .replace(/[\\/:*?"<>|\n\r\t]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 40)
-  return cleaned || '提示词-图美AI'
+}
+
+/** Filename = relay words only (reply_keyword first); filesystem-safe Chinese OK. */
+function buildFilename(relayWords: string[]): string {
+  const parts: string[] = []
+  const seen = new Set<string>()
+  for (const w of relayWords) {
+    const cleaned = sanitizeFilenamePart(w)
+    if (!cleaned || seen.has(cleaned)) continue
+    seen.add(cleaned)
+    parts.push(cleaned)
+  }
+  if (parts.length === 0) return '提示词-图美AI'
+
+  // Soft cap; keep earlier segments (reply_keyword first)
+  let name = parts.join('-')
+  if (name.length > 80) {
+    const kept: string[] = []
+    let len = 0
+    for (const p of parts) {
+      const next = kept.length === 0 ? p.length : len + 1 + p.length
+      if (kept.length > 0 && next > 80) break
+      kept.push(p)
+      len = next
+    }
+    name = kept.join('-') || parts[0].slice(0, 80)
+  }
+  return name
 }
 
 function uniqueNonEmpty(words: string[] | undefined): string[] {
@@ -291,7 +317,7 @@ export async function downloadPromptCard(
     y += bodyLineH
   }
 
-  const filename = `${sanitizeFilename(options.title ?? '')}.png`
+  const filename = `${buildFilename(relayWords)}.png`
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
