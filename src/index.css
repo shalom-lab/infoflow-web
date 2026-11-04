@@ -411,6 +411,34 @@ strong {
     order: 2;
     margin-left: auto;
   }
+  /* Taller title search on phones / narrow screens */
+  .header-search .search-input {
+    height: 2.55rem;
+    line-height: 2.55rem;
+    font-size: 0.92rem;
+    padding-left: 2.1rem;
+    padding-right: 4rem;
+  }
+  .header-search .search-input-wrap.has-clear .search-input {
+    padding-right: 5.4rem;
+  }
+  .header-search .search-icon {
+    left: 0.8rem;
+    font-size: 0.95rem;
+  }
+  .header-search .clear-search {
+    right: 3.2rem;
+    width: 1.4rem;
+    height: 1.4rem;
+  }
+  .header-search .result-count {
+    right: 0.8rem;
+    font-size: 0.72rem;
+  }
+  .toast-stack {
+    top: calc(var(--shell-pad-y) + 5.6rem);
+    width: min(100%, calc(100vw - 1.25rem));
+  }
 }
 .filters-active-dot {
   width: 0.4rem;
@@ -1869,15 +1897,18 @@ strong {
 
 /* Toasts */
 .toast-stack {
+  /* Sit under top-right header actions — don't steal center search space */
   position: fixed;
-  top: 0.85rem;
-  left: 50%;
-  transform: translateX(-50%);
+  top: calc(var(--shell-pad-y) + 3.15rem);
+  right: max(var(--shell-pad-x), 0.75rem);
+  left: auto;
   z-index: 2000;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
-  width: min(560px, calc(100vw - 1.5rem));
+  align-items: flex-end;
+  gap: 0.4rem;
+  width: min(340px, calc(100vw - 1.5rem));
+  max-width: calc(100vw - 1.5rem);
   pointer-events: none;
 }
 
@@ -1885,12 +1916,13 @@ strong {
   pointer-events: auto;
   display: flex;
   align-items: flex-start;
-  gap: 0.55rem;
-  padding: 0.55rem 0.65rem 0.55rem 0.85rem;
-  border-radius: var(--radius-pill);
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem 0.45rem 0.7rem;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
-  font-size: 0.82rem;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  line-height: 1.35;
   box-shadow: var(--shadow);
   animation: toast-in 0.22s var(--ease);
 }

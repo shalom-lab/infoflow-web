@@ -231,6 +231,29 @@ export function HomePage({ settings }: Props) {
     }
   }, [filtersOpen])
 
+  // On first open: if clipboard has text and search is still empty, prefill query.
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        if (!navigator.clipboard?.readText) return
+        const raw = await navigator.clipboard.readText()
+        if (cancelled) return
+        const text = raw.replace(/\s+/g, ' ').trim()
+        if (!text) return
+        // Avoid dumping huge paste into search
+        const clipped = text.slice(0, 120)
+        setQuery((prev) => (prev.trim() ? prev : clipped))
+      } catch {
+        // permission denied / insecure context / unsupported — silent
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const forceFlag = searchParams.get('force') === '1'
 
   useEffect(() => {
