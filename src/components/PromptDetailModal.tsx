@@ -13,6 +13,25 @@ interface Props {
   onClose: () => void
 }
 
+function CopyIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  )
+}
+
 function DownloadIcon() {
   return (
     <svg
@@ -31,6 +50,21 @@ function DownloadIcon() {
       <path d="M5 19h14" />
     </svg>
   )
+}
+
+/** Build pill labels for the download card: reply_keyword first, then keywords. */
+function relayWordsFor(prompt: PromptItem): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const push = (raw: string | undefined) => {
+    const t = raw?.trim()
+    if (!t || seen.has(t)) return
+    seen.add(t)
+    out.push(t)
+  }
+  push(prompt.reply_keyword)
+  for (const kw of prompt.keywords) push(kw)
+  return out
 }
 
 export function PromptDetailModal({
@@ -113,6 +147,7 @@ export function PromptDetailModal({
       await downloadPromptCard({
         content: prompt.content,
         title: title === '(无标题)' ? '提示词-图美AI' : title,
+        relayWords: relayWordsFor(prompt),
       })
       setDownloaded(true)
       window.setTimeout(() => setDownloaded(false), 1800)
@@ -123,6 +158,7 @@ export function PromptDetailModal({
     }
   }
 
+  const copyLabel = copied ? '已复制' : '复制提示词'
   const downloadLabel = downloading
     ? '生成中…'
     : downloaded
@@ -211,16 +247,20 @@ export function PromptDetailModal({
                 ) : null}
                 <button
                   type="button"
-                  className="btn sm primary detail-copy-btn"
+                  className={`detail-icon-btn detail-copy-btn${
+                    copied ? ' ok' : ''
+                  }`}
                   onClick={() => void handleCopy()}
+                  title={copyLabel}
+                  aria-label={copyLabel}
                 >
-                  {copied ? '已复制' : '复制提示词'}
+                  {copied ? '✓' : <CopyIcon />}
                 </button>
                 <button
                   type="button"
-                  className={`detail-download-btn${downloaded ? ' ok' : ''}${
-                    downloading ? ' busy' : ''
-                  }`}
+                  className={`detail-icon-btn detail-download-btn${
+                    downloaded ? ' ok' : ''
+                  }${downloading ? ' busy' : ''}`}
                   onClick={() => void handleDownload()}
                   disabled={downloading}
                   title={downloadLabel}
