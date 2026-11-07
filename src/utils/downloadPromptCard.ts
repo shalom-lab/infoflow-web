@@ -1,16 +1,16 @@
 /**
  * Downloadable prompt card JPEG for the detail modal.
- * Compact header (left meta + right single contain-fit cover) → divider →
- * full prompt body → bottom CTA bar. Accent palette random among 5 themes.
+ * Compact header (left meta + right tight-bordered cover) → CTA bar →
+ * full prompt body. Accent palette random among 5 themes.
  */
 
 const CARD_WIDTH = 1080
 const CARD_RADIUS = 22
 const PAD_X = 32
 const PAD_TOP = 28
-const BODY_PAD_Y = 22
-const PAD_BOTTOM_BODY = 24
-const FOOTER_H = 52
+const BODY_PAD_Y = 20
+const PAD_BOTTOM_BODY = 28
+const CTA_BAR_H = 48
 const TITLE_SIZE = 30
 const TITLE_LINE_GAP = 4
 const BODY_SIZE = 16
@@ -24,8 +24,10 @@ const PILL_PAD_Y = 5
 const PILL_GAP = 6
 const PILL_ROW_GAP = 6
 const CTA_SIZE = 14
-const COVER_SIZE = 220
-const COVER_RADIUS = 16
+/** Max box for cover — image keeps aspect, no letterbox square */
+const COVER_MAX_W = 240
+const COVER_MAX_H = 280
+const COVER_RADIUS = 14
 const LEFT_RIGHT_GAP = 24
 const META_GAP = 12
 
@@ -46,7 +48,6 @@ type Palette = {
   softText: string
   ctaText: string
   border: string
-  letterbox: string
 }
 
 const PALETTES: Palette[] = [
@@ -58,7 +59,6 @@ const PALETTES: Palette[] = [
     softText: '#4a3fbb',
     ctaText: '#3d3a6b',
     border: '#d8cef0',
-    letterbox: '#f5f3fc',
   },
   {
     name: 'teal',
@@ -68,7 +68,6 @@ const PALETTES: Palette[] = [
     softText: '#0f766e',
     ctaText: '#134e4a',
     border: '#c5e8e3',
-    letterbox: '#f0faf8',
   },
   {
     name: 'coral',
@@ -78,7 +77,6 @@ const PALETTES: Palette[] = [
     softText: '#be123c',
     ctaText: '#881337',
     border: '#f8cdd6',
-    letterbox: '#fff5f7',
   },
   {
     name: 'blue',
@@ -88,7 +86,6 @@ const PALETTES: Palette[] = [
     softText: '#1d4ed8',
     ctaText: '#1e3a8a',
     border: '#cdd9f8',
-    letterbox: '#f3f6ff',
   },
   {
     name: 'amber',
@@ -98,7 +95,6 @@ const PALETTES: Palette[] = [
     softText: '#b45309',
     ctaText: '#78350f',
     border: '#f5dfb8',
-    letterbox: '#fffaf0',
   },
 ]
 
@@ -107,7 +103,7 @@ export type PromptCardOptions = {
   replyKeyword?: string
   title?: string
   keywords?: string[]
-  /** Single cover image — drawn with object-fit: contain (no crop) */
+  /** Cover image — drawn at natural aspect with tight border (no crop, no letterbox) */
   coverUrl?: string
 }
 
@@ -295,33 +291,87 @@ async function loadCoverImage(
   }
 }
 
-/** object-fit: contain — full image visible, letterbox OK, no crop. */
-function drawCoverContain(
+/** Fit inside max box keeping aspect; no crop. */
+function coverDrawSize(img: HTMLImageElement): { w: number; h: number } {
+  const scale = Math.min(
+    COVER_MAX_W / img.naturalWidth,
+    COVER_MAX_H / img.naturalHeight,
+  )
+  return {
+    w: Math.max(1, Math.round(img.naturalWidth * scale)),
+    h: Math.max(1, Math.round(img.naturalHeight * scale)),
+  }
+}
+
+/**
+ * Draw image at exact aspect size with a tight border hugging the pixels.
+ * No white letterbox / fixed square frame.
+ */
+function drawCoverTight(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
   x: number,
   y: number,
-  size: number,
+  w: number,
+  h: number,
   radius: number,
-  palette: Palette,
+  borderColor: string,
 ): void {
-  roundRect(ctx, x, y, size, size, radius)
-  ctx.fillStyle = palette.letterbox
-  ctx.fill()
-
   ctx.save()
-  roundRect(ctx, x, y, size, size, radius)
+  roundRect(ctx, x, y, w, h, radius)
   ctx.clip()
-  const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight)
-  const dw = img.naturalWidth * scale
-  const dh = img.naturalHeight * scale
-  ctx.drawImage(img, x + (size - dw) / 2, y + (size - dh) / 2, dw, dh)
+  ctx.drawImage(img, x, y, w, h)
   ctx.restore()
 
-  roundRect(ctx, x, y, size, size, radius)
-  ctx.strokeStyle = palette.softBorder
-  ctx.lineWidth = 1.25
+  roundRect(ctx, x, y, w, h, radius)
+  ctx.strokeStyle = borderColor
+  ctx.lineWidth = 1.5
   ctx.stroke()
+}
+
+function drawCtaBar(
+  ctx: CanvasRenderingContext2D,
+  y: number,
+  palette: Palette,
+): void {
+  ctx.fillStyle = palette.soft
+  ctx.fillRect(0, y, CARD_WIDTH, CTA_BAR_H)
+
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  const beforeW = ctx.measureText(CTA_BEFORE).width
+  const afterW = ctx.measureText(CTA_AFTER).width
+  const gapBefore = 7
+  const gapAfter = 7
+  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
+  const brandTw = ctx.measureText(CTA_BRAND).width
+  const brandPadX = 9
+  const brandPadY = 4
+  const brandW = brandTw + brandPadX * 2
+  const brandH = CTA_SIZE + brandPadY * 2
+  const clusterW = beforeW + gapBefore + brandW + gapAfter + afterW
+  const midY = y + CTA_BAR_H / 2
+  let cx = CARD_WIDTH - PAD_X - clusterW
+
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = palette.ctaText
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(CTA_BEFORE, cx, midY)
+  cx += beforeW + gapBefore
+
+  roundRect(ctx, cx, midY - brandH / 2, brandW, brandH, 6)
+  ctx.fillStyle = palette.accent
+  ctx.fill()
+  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = '#ffffff'
+  ctx.textAlign = 'center'
+  ctx.fillText(CTA_BRAND, cx + brandW / 2, midY)
+  cx += brandW + gapAfter
+
+  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
+  ctx.fillStyle = palette.ctaText
+  ctx.textAlign = 'left'
+  ctx.fillText(CTA_AFTER, cx, midY)
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -337,7 +387,7 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /**
- * Compact header + divider + prompt body + CTA footer → JPEG download.
+ * Header (meta + tight cover) → CTA bar under header → prompt body → JPEG.
  */
 export async function downloadPromptCard(
   options: PromptCardOptions,
@@ -350,14 +400,16 @@ export async function downloadPromptCard(
   )
   const palette = pickPalette()
   const coverImg = await loadCoverImage(options.coverUrl)
-  const hasCover = coverImg != null
+  const coverSize = coverImg ? coverDrawSize(coverImg) : null
 
   const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('Canvas 不可用')
 
   const leftMaxW =
-    CARD_WIDTH - PAD_X * 2 - (hasCover ? COVER_SIZE + LEFT_RIGHT_GAP : 0)
+    CARD_WIDTH -
+    PAD_X * 2 -
+    (coverSize ? coverSize.w + LEFT_RIGHT_GAP : 0)
 
   const relayPill = replyKeyword
     ? measurePill(
@@ -382,7 +434,7 @@ export async function downloadPromptCard(
     (titleBlockH > 0 ? titleBlockH + META_GAP : 0) +
     pillLayout.height
 
-  const headerH = Math.max(leftColH, hasCover ? COVER_SIZE : 0)
+  const headerH = Math.max(leftColH, coverSize?.h ?? 0)
 
   const textWidth = CARD_WIDTH - PAD_X * 2
   measure.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
@@ -390,16 +442,15 @@ export async function downloadPromptCard(
   const bodyLineH = BODY_SIZE + BODY_LINE_GAP
   const bodyBlockH = Math.max(bodyLines.length, 1) * bodyLineH
 
-  const dividerGap = 18
+  const afterHeaderGap = 16
   const height = Math.ceil(
     PAD_TOP +
       headerH +
-      dividerGap +
-      1 +
+      afterHeaderGap +
+      CTA_BAR_H +
       BODY_PAD_Y +
       bodyBlockH +
-      PAD_BOTTOM_BODY +
-      FOOTER_H,
+      PAD_BOTTOM_BODY,
   )
 
   const canvas = document.createElement('canvas')
@@ -470,31 +521,27 @@ export async function downloadPromptCard(
     }
   }
 
-  if (hasCover && coverImg) {
-    const coverX = CARD_WIDTH - PAD_X - COVER_SIZE
-    const coverY = headerTop + Math.max(0, (headerH - COVER_SIZE) / 2)
-    drawCoverContain(
+  if (coverImg && coverSize) {
+    const coverX = CARD_WIDTH - PAD_X - coverSize.w
+    const coverY = headerTop + Math.max(0, (headerH - coverSize.h) / 2)
+    drawCoverTight(
       ctx,
       coverImg,
       coverX,
       coverY,
-      COVER_SIZE,
+      coverSize.w,
+      coverSize.h,
       COVER_RADIUS,
-      palette,
+      palette.accent,
     )
   }
 
-  // ——— DIVIDER ———
-  const dividerY = PAD_TOP + headerH + dividerGap / 2
-  ctx.strokeStyle = palette.softBorder
-  ctx.lineWidth = 1.25
-  ctx.beginPath()
-  ctx.moveTo(PAD_X, dividerY)
-  ctx.lineTo(CARD_WIDTH - PAD_X, dividerY)
-  ctx.stroke()
+  // ——— CTA BAR (under header, not at bottom) ———
+  const ctaY = PAD_TOP + headerH + afterHeaderGap
+  drawCtaBar(ctx, ctaY, palette)
 
   // ——— PROMPT BODY ———
-  const bodyStartY = PAD_TOP + headerH + dividerGap + BODY_PAD_Y
+  const bodyStartY = ctaY + CTA_BAR_H + BODY_PAD_Y
   ctx.fillStyle = '#2a2a32'
   ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
   ctx.textAlign = 'left'
@@ -504,47 +551,6 @@ export async function downloadPromptCard(
     ctx.fillText(line, PAD_X, by)
     by += bodyLineH
   }
-
-  // ——— FOOTER CTA ———
-  const footerY = height - FOOTER_H
-  ctx.fillStyle = palette.soft
-  ctx.fillRect(0, footerY, CARD_WIDTH, FOOTER_H)
-
-  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
-  const beforeW = ctx.measureText(CTA_BEFORE).width
-  const afterW = ctx.measureText(CTA_AFTER).width
-  const gapBefore = 7
-  const gapAfter = 7
-  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
-  const brandTw = ctx.measureText(CTA_BRAND).width
-  const brandPadX = 9
-  const brandPadY = 4
-  const brandW = brandTw + brandPadX * 2
-  const brandH = CTA_SIZE + brandPadY * 2
-  const clusterW = beforeW + gapBefore + brandW + gapAfter + afterW
-  const midY = footerY + FOOTER_H / 2
-  let cx = CARD_WIDTH - PAD_X - clusterW
-
-  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
-  ctx.fillStyle = palette.ctaText
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(CTA_BEFORE, cx, midY)
-  cx += beforeW + gapBefore
-
-  roundRect(ctx, cx, midY - brandH / 2, brandW, brandH, 6)
-  ctx.fillStyle = palette.accent
-  ctx.fill()
-  ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
-  ctx.fillStyle = '#ffffff'
-  ctx.textAlign = 'center'
-  ctx.fillText(CTA_BRAND, cx + brandW / 2, midY)
-  cx += brandW + gapAfter
-
-  ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
-  ctx.fillStyle = palette.ctaText
-  ctx.textAlign = 'left'
-  ctx.fillText(CTA_AFTER, cx, midY)
 
   ctx.restore()
 
