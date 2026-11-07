@@ -33,8 +33,8 @@ const PILL_PAD_Y = 4
 const PILL_GAP = 6
 const PILL_ROW_GAP = 6
 const CTA_SIZE = 14
-const COVER_RADIUS = 14
-const THUMB_RADIUS = 10
+const COVER_RADIUS = 6
+const THUMB_RADIUS = 5
 const META_GAP = 10
 const LEFT_RIGHT_GAP = 20
 const THUMB_GAP = 8
@@ -408,9 +408,9 @@ function drawCoverTight(
   ctx.clip()
   ctx.drawImage(img, x, y, w, h)
   ctx.restore()
-  roundRect(ctx, x, y, w, h, radius)
+  roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, radius - 0.5))
   ctx.strokeStyle = borderColor
-  ctx.lineWidth = 1.5
+  ctx.lineWidth = 0.75
   ctx.stroke()
 }
 
@@ -714,7 +714,7 @@ export async function generatePromptCard(
         slot.w,
         slot.h,
         THUMB_RADIUS,
-        palette.accent,
+        palette.softBorder,
       )
       tx += slot.w + THUMB_GAP
     }
@@ -740,7 +740,7 @@ export async function generatePromptCard(
         slot.w,
         slot.h,
         COVER_RADIUS,
-        palette.accent,
+        palette.softBorder,
       )
       fy += slot.h + FLOAT_STACK_GAP
     }
