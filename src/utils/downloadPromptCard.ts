@@ -13,8 +13,9 @@ import {
   type LayoutCursor,
 } from '@chenglou/pretext'
 
-const CARD_WIDTH = 1080
-const CARD_RADIUS = 22
+/** Prefer narrower cards; pick among these via layout probe. */
+const WIDTH_CANDIDATES = [720, 800, 900, 1000] as const
+const CARD_RADIUS = 20
 const PAD_X = 32
 const PAD_TOP = 24
 const BODY_PAD_Y = 18
@@ -418,9 +419,10 @@ function drawCtaBar(
   ctx: CanvasRenderingContext2D,
   y: number,
   palette: Palette,
+  cardWidth: number,
 ): void {
   ctx.fillStyle = palette.soft
-  ctx.fillRect(0, y, CARD_WIDTH, CTA_BAR_H)
+  ctx.fillRect(0, y, cardWidth, CTA_BAR_H)
 
   ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
   const beforeW = ctx.measureText(CTA_BEFORE).width
@@ -435,7 +437,7 @@ function drawCtaBar(
   const brandH = CTA_SIZE + brandPadY * 2
   const clusterW = beforeW + gapBefore + brandW + gapAfter + afterW
   const midY = y + CTA_BAR_H / 2
-  let cx = CARD_WIDTH - PAD_X - clusterW
+  let cx = cardWidth - PAD_X - clusterW
 
   ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
   ctx.fillStyle = palette.ctaText
@@ -528,6 +530,73 @@ function canvasToBlob(
   })
 }
 
+
+/** Pick float column (1 vs 2) for a given content width. */
+function chooseFloatCol(
+  loaded: HTMLImageElement[],
+  contentW: number,
+  content: string,
+): ReturnType<typeof layoutFloatStack> {
+  const floatMaxW = Math.floor(contentW * FLOAT_WIDTH_RATIO)
+  const floatOne = layoutFloatStack(loaded.slice(0, 1), floatMaxW)
+  if (loaded.length < 2) return floatOne
+  const floatTwo = layoutFloatStack(loaded.slice(0, 2), floatMaxW)
+  const probe = layoutFloatedBodyLines(
+    content || ' ',
+    contentW,
+    floatTwo.colW,
+    floatTwo.colH,
+  )
+  const emptyBelow = floatTwo.colH - probe.textHeight
+  const emptyOk =
+    emptyBelow <= Math.max(64, Math.round(floatTwo.colH * 0.12))
+  return emptyOk ? floatTwo : floatOne
+}
+
+/**
+ * Probe WIDTH_CANDIDATES with pretext float layout; prefer less empty space
+ * and readable text column, tie-break toward narrower width.
+ */
+function chooseCardWidth(
+  loaded: HTMLImageElement[],
+  content: string,
+): number {
+  type Score = { width: number; score: number }
+  const scored: Score[] = []
+
+  for (const width of WIDTH_CANDIDATES) {
+    const contentW = width - PAD_X * 2
+    const floatCol = chooseFloatCol(loaded, contentW, content)
+    const body = layoutFloatedBodyLines(
+      content || ' ',
+      contentW,
+      floatCol.colW,
+      floatCol.colH,
+    )
+    const textCol =
+      floatCol.colW > 0
+        ? contentW - floatCol.colW - FLOAT_GAP
+        : contentW
+    const empty = Math.max(0, floatCol.colH - body.textHeight)
+    const emptyRatio = empty / Math.max(1, body.height)
+    // Penalize unreadably narrow wrap columns beside tall floats
+    const narrowPenalty = textCol < 168 ? (168 - textCol) * 4 : 0
+    // Mild preference for shorter cards (less wasted vertical after float)
+    const aspectSlack = body.height / Math.max(1, width)
+    const score =
+      empty * 1.15 +
+      emptyRatio * 220 +
+      narrowPenalty +
+      aspectSlack * 40 +
+      // slight bias to narrower when scores are close
+      (width - WIDTH_CANDIDATES[0]) * 0.02
+    scored.push({ width, score })
+  }
+
+  scored.sort((a, b) => a.score - b.score || a.width - b.width)
+  return scored[0]?.width ?? WIDTH_CANDIDATES[0]
+}
+
 /**
  * Shared card renderer: header meta + ≤3 thumbs → CTA → floated image(s) + wrap text.
  */
@@ -561,11 +630,13 @@ export async function generatePromptCard(
     )
   ).filter((img): img is HTMLImageElement => img != null)
 
+  const cardWidth = chooseCardWidth(loaded, content || ' ')
+
   const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('Canvas 不可用')
 
-  const contentW = CARD_WIDTH - PAD_X * 2
+  const contentW = cardWidth - PAD_X * 2
   const rightMax = loaded.length
     ? Math.floor(contentW * RIGHT_RESERVE_RATIO)
     : 0
@@ -602,24 +673,7 @@ export async function generatePromptCard(
     thumbs.reduce((s, t) => s + t.w, 0) +
     Math.max(0, thumbs.length - 1) * THUMB_GAP
 
-  const floatMaxW = Math.floor(contentW * FLOAT_WIDTH_RATIO)
-  // Default: one large current image. Add a 2nd float only when text is long
-  // enough to fill the space beside a two-image stack (avoid empty lower-left).
-  const floatOne = layoutFloatStack(loaded.slice(0, 1), floatMaxW)
-  let floatCol = floatOne
-  if (loaded.length >= 2) {
-    const floatTwo = layoutFloatStack(loaded.slice(0, 2), floatMaxW)
-    const probe = layoutFloatedBodyLines(
-      content || ' ',
-      contentW,
-      floatTwo.colW,
-      floatTwo.colH,
-    )
-    const emptyBelow = floatTwo.colH - probe.textHeight
-    const emptyOk =
-      emptyBelow <= Math.max(64, Math.round(floatTwo.colH * 0.12))
-    if (emptyOk) floatCol = floatTwo
-  }
+  const floatCol = chooseFloatCol(loaded, contentW, content || ' ')
   const bodyLayout = layoutFloatedBodyLines(
     content || ' ',
     contentW,
@@ -639,18 +693,18 @@ export async function generatePromptCard(
   )
 
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(CARD_WIDTH * dpr)
+  canvas.width = Math.round(cardWidth * dpr)
   canvas.height = Math.round(height * dpr)
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 不可用')
   ctx.scale(dpr, dpr)
 
-  roundRect(ctx, 0, 0, CARD_WIDTH, height, CARD_RADIUS)
+  roundRect(ctx, 0, 0, cardWidth, height, CARD_RADIUS)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
 
   ctx.save()
-  roundRect(ctx, 0, 0, CARD_WIDTH, height, CARD_RADIUS)
+  roundRect(ctx, 0, 0, cardWidth, height, CARD_RADIUS)
   ctx.clip()
 
   // ——— Compact header meta ———
@@ -703,7 +757,7 @@ export async function generatePromptCard(
 
   // ——— Header right-aligned thumbs (current → next → wrap) ———
   if (thumbs.length > 0) {
-    let tx = CARD_WIDTH - PAD_X - thumbsRowW
+    let tx = cardWidth - PAD_X - thumbsRowW
     for (const slot of thumbs) {
       const ty = PAD_TOP + Math.max(0, (headerH - slot.h) / 2)
       drawCoverTight(
@@ -722,14 +776,14 @@ export async function generatePromptCard(
 
   // ——— CTA under header ———
   const ctaY = PAD_TOP + headerH + afterHeaderGap
-  drawCtaBar(ctx, ctaY, palette)
+  drawCtaBar(ctx, ctaY, palette, cardWidth)
 
   // ——— Body: float images + pretext-wrapped text ———
   const bodyStartY = ctaY + CTA_BAR_H + BODY_PAD_Y
 
   if (floatCol.slots.length > 0) {
     let fy = bodyStartY
-    const floatLeft = CARD_WIDTH - PAD_X - floatCol.colW
+    const floatLeft = cardWidth - PAD_X - floatCol.colW
     for (const slot of floatCol.slots) {
       const fx = floatLeft + (floatCol.colW - slot.w) // right-align within column
       drawCoverTight(
@@ -761,7 +815,7 @@ export async function generatePromptCard(
 
   ctx.restore()
 
-  roundRect(ctx, 1, 1, CARD_WIDTH - 2, height - 2, CARD_RADIUS - 1)
+  roundRect(ctx, 1, 1, cardWidth - 2, height - 2, CARD_RADIUS - 1)
   ctx.strokeStyle = palette.border
   ctx.lineWidth = 2
   ctx.stroke()
