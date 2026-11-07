@@ -1,30 +1,33 @@
 /**
- * Horizontal share-card JPEG for the detail modal download button.
- * Matches the 图美AI sample: left meta + right cover + bottom CTA bar.
- * Accent palette is picked at random per download (5 themes).
+ * Downloadable prompt card JPEG for the detail modal.
+ * Compact header (left meta + right single contain-fit cover) → divider →
+ * full prompt body → bottom CTA bar. Accent palette random among 5 themes.
  */
 
 const CARD_WIDTH = 1080
-const CARD_RADIUS = 28
-const PAD_X = 44
-const PAD_TOP = 40
-const PAD_BOTTOM_CONTENT = 36
-const FOOTER_H = 64
-const TITLE_SIZE = 36
-const TITLE_LINE_GAP = 8
-const RELAY_FONT = 17
-const RELAY_PAD_X = 18
-const RELAY_PAD_Y = 9
-const PILL_FONT = 14
-const PILL_PAD_X = 12
-const PILL_PAD_Y = 6
-const PILL_GAP = 8
-const PILL_ROW_GAP = 8
-const CTA_SIZE = 15
-const COVER_SIZE = 280
-const COVER_RADIUS = 22
-const STACK_OFFSET = 10
-const LEFT_RIGHT_GAP = 36
+const CARD_RADIUS = 22
+const PAD_X = 32
+const PAD_TOP = 28
+const BODY_PAD_Y = 22
+const PAD_BOTTOM_BODY = 24
+const FOOTER_H = 52
+const TITLE_SIZE = 30
+const TITLE_LINE_GAP = 4
+const BODY_SIZE = 16
+const BODY_LINE_GAP = 6
+const RELAY_FONT = 15
+const RELAY_PAD_X = 14
+const RELAY_PAD_Y = 6
+const PILL_FONT = 13
+const PILL_PAD_X = 10
+const PILL_PAD_Y = 5
+const PILL_GAP = 6
+const PILL_ROW_GAP = 6
+const CTA_SIZE = 14
+const COVER_SIZE = 220
+const COVER_RADIUS = 16
+const LEFT_RIGHT_GAP = 24
+const META_GAP = 12
 
 const FONT_STACK =
   '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif'
@@ -43,7 +46,7 @@ type Palette = {
   softText: string
   ctaText: string
   border: string
-  stack: string
+  letterbox: string
 }
 
 const PALETTES: Palette[] = [
@@ -55,7 +58,7 @@ const PALETTES: Palette[] = [
     softText: '#4a3fbb',
     ctaText: '#3d3a6b',
     border: '#d8cef0',
-    stack: '#ddd6f8',
+    letterbox: '#f5f3fc',
   },
   {
     name: 'teal',
@@ -65,7 +68,7 @@ const PALETTES: Palette[] = [
     softText: '#0f766e',
     ctaText: '#134e4a',
     border: '#c5e8e3',
-    stack: '#cfeceb',
+    letterbox: '#f0faf8',
   },
   {
     name: 'coral',
@@ -75,7 +78,7 @@ const PALETTES: Palette[] = [
     softText: '#be123c',
     ctaText: '#881337',
     border: '#f8cdd6',
-    stack: '#fdd5dd',
+    letterbox: '#fff5f7',
   },
   {
     name: 'blue',
@@ -85,7 +88,7 @@ const PALETTES: Palette[] = [
     softText: '#1d4ed8',
     ctaText: '#1e3a8a',
     border: '#cdd9f8',
-    stack: '#d4e0fc',
+    letterbox: '#f3f6ff',
   },
   {
     name: 'amber',
@@ -95,23 +98,17 @@ const PALETTES: Palette[] = [
     softText: '#b45309',
     ctaText: '#78350f',
     border: '#f5dfb8',
-    stack: '#f7e4c0',
+    letterbox: '#fffaf0',
   },
 ]
 
 export type PromptCardOptions = {
-  /** Unused on the horizontal share card; kept for call-site compat */
-  content?: string
-  /** reply_keyword — solid accent pill; also used for filename */
+  content: string
   replyKeyword?: string
-  /** wechat_title — bold title */
   title?: string
-  /** keywords[] — soft accent pills */
   keywords?: string[]
-  /** First/cover image (object URL or https) */
+  /** Single cover image — drawn with object-fit: contain (no crop) */
   coverUrl?: string
-  /** Optional second image for stacked peek behind cover */
-  secondCoverUrl?: string
 }
 
 function pickPalette(): Palette {
@@ -234,7 +231,7 @@ function drawFilledPill(
   ctx.fill()
   if (border) {
     ctx.strokeStyle = border
-    ctx.lineWidth = 1.1
+    ctx.lineWidth = 1
     ctx.stroke()
   }
   ctx.font = `600 ${fontSize}px ${FONT_STACK}`
@@ -298,63 +295,33 @@ async function loadCoverImage(
   }
 }
 
-function drawCoverInto(
+/** object-fit: contain — full image visible, letterbox OK, no crop. */
+function drawCoverContain(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
   x: number,
   y: number,
   size: number,
   radius: number,
-  borderColor: string,
+  palette: Palette,
 ): void {
+  roundRect(ctx, x, y, size, size, radius)
+  ctx.fillStyle = palette.letterbox
+  ctx.fill()
+
   ctx.save()
   roundRect(ctx, x, y, size, size, radius)
   ctx.clip()
-  const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight)
+  const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight)
   const dw = img.naturalWidth * scale
   const dh = img.naturalHeight * scale
   ctx.drawImage(img, x + (size - dw) / 2, y + (size - dh) / 2, dw, dh)
   ctx.restore()
+
   roundRect(ctx, x, y, size, size, radius)
-  ctx.strokeStyle = borderColor
-  ctx.lineWidth = 1.5
-  ctx.stroke()
-}
-
-function drawStackedCover(
-  ctx: CanvasRenderingContext2D,
-  cover: HTMLImageElement,
-  second: HTMLImageElement | null,
-  x: number,
-  y: number,
-  size: number,
-  radius: number,
-  palette: Palette,
-): void {
-  // Back peek plate (slightly up/right) — sample style stacked card
-  const backX = x + STACK_OFFSET
-  const backY = y - STACK_OFFSET
-  roundRect(ctx, backX, backY, size, size, radius)
-  ctx.fillStyle = palette.stack
-  ctx.fill()
-  if (second) {
-    ctx.save()
-    roundRect(ctx, backX, backY, size, size, radius)
-    ctx.clip()
-    // Only show a thin top strip of the second image
-    const scale = Math.max(size / second.naturalWidth, size / second.naturalHeight)
-    const dw = second.naturalWidth * scale
-    const dh = second.naturalHeight * scale
-    ctx.globalAlpha = 0.85
-    ctx.drawImage(second, backX + (size - dw) / 2, backY + (size - dh) / 2, dw, dh)
-    ctx.restore()
-  }
-  roundRect(ctx, backX, backY, size, size, radius)
   ctx.strokeStyle = palette.softBorder
-  ctx.lineWidth = 1
+  ctx.lineWidth = 1.25
   ctx.stroke()
-
-  drawCoverInto(ctx, cover, x, y, size, radius, palette.softBorder)
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -370,32 +337,27 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /**
- * Draw a horizontal share card and download as JPEG.
- * Palette is randomized among purple / teal / coral / blue / amber.
+ * Compact header + divider + prompt body + CTA footer → JPEG download.
  */
 export async function downloadPromptCard(
   options: PromptCardOptions,
 ): Promise<void> {
+  const content = (options.content ?? '').replace(/\r\n/g, '\n')
   const replyKeyword = (options.replyKeyword ?? '').trim()
   const title = (options.title ?? '').trim()
   const keywords = uniqueNonEmpty(options.keywords).filter(
     (k) => k !== replyKeyword,
   )
   const palette = pickPalette()
-
-  const [coverImg, secondImg] = await Promise.all([
-    loadCoverImage(options.coverUrl),
-    loadCoverImage(options.secondCoverUrl),
-  ])
+  const coverImg = await loadCoverImage(options.coverUrl)
   const hasCover = coverImg != null
 
   const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) throw new Error('Canvas 不可用')
 
-  const coverBlockW = hasCover ? COVER_SIZE + STACK_OFFSET : 0
   const leftMaxW =
-    CARD_WIDTH - PAD_X * 2 - (hasCover ? coverBlockW + LEFT_RIGHT_GAP : 0)
+    CARD_WIDTH - PAD_X * 2 - (hasCover ? COVER_SIZE + LEFT_RIGHT_GAP : 0)
 
   const relayPill = replyKeyword
     ? measurePill(
@@ -416,14 +378,28 @@ export async function downloadPromptCard(
   const pillLayout = layoutPills(measure, keywords, leftMaxW)
 
   const leftColH =
-    (relayPill ? relayPill.height + 18 : 0) +
-    (titleBlockH > 0 ? titleBlockH + 18 : 0) +
+    (relayPill ? relayPill.height + META_GAP : 0) +
+    (titleBlockH > 0 ? titleBlockH + META_GAP : 0) +
     pillLayout.height
 
-  const coverBlockH = hasCover ? COVER_SIZE + STACK_OFFSET : 0
-  const contentH = Math.max(leftColH, coverBlockH)
+  const headerH = Math.max(leftColH, hasCover ? COVER_SIZE : 0)
+
+  const textWidth = CARD_WIDTH - PAD_X * 2
+  measure.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
+  const bodyLines = wrapLines(measure, content, textWidth)
+  const bodyLineH = BODY_SIZE + BODY_LINE_GAP
+  const bodyBlockH = Math.max(bodyLines.length, 1) * bodyLineH
+
+  const dividerGap = 18
   const height = Math.ceil(
-    PAD_TOP + contentH + PAD_BOTTOM_CONTENT + FOOTER_H,
+    PAD_TOP +
+      headerH +
+      dividerGap +
+      1 +
+      BODY_PAD_Y +
+      bodyBlockH +
+      PAD_BOTTOM_BODY +
+      FOOTER_H,
   )
 
   const canvas = document.createElement('canvas')
@@ -433,22 +409,18 @@ export async function downloadPromptCard(
   if (!ctx) throw new Error('Canvas 不可用')
   ctx.scale(dpr, dpr)
 
-  // Card background with rounded corners
   roundRect(ctx, 0, 0, CARD_WIDTH, height, CARD_RADIUS)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
-  ctx.strokeStyle = palette.border
-  ctx.lineWidth = 2
-  ctx.stroke()
 
-  // Clip subsequent draws to rounded card
   ctx.save()
   roundRect(ctx, 0, 0, CARD_WIDTH, height, CARD_RADIUS)
   ctx.clip()
 
-  // LEFT column — vertically centered in content band
-  const contentTop = PAD_TOP + Math.max(0, (contentH - leftColH) / 2)
-  let y = contentTop
+  // ——— HEADER ———
+  const headerTop = PAD_TOP
+  const leftTop = headerTop + Math.max(0, (headerH - leftColH) / 2)
+  let y = leftTop
 
   if (relayPill) {
     drawFilledPill(
@@ -461,7 +433,7 @@ export async function downloadPromptCard(
       palette.accent,
       '#ffffff',
     )
-    y += relayPill.height + 18
+    y += relayPill.height + META_GAP
   }
 
   if (titleLines.length > 0) {
@@ -473,7 +445,7 @@ export async function downloadPromptCard(
       ctx.fillText(line, PAD_X, y)
       y += titleLineH
     }
-    y += 18 - TITLE_LINE_GAP
+    y += META_GAP - TITLE_LINE_GAP
   }
 
   if (pillLayout.rows.length > 0) {
@@ -498,14 +470,12 @@ export async function downloadPromptCard(
     }
   }
 
-  // RIGHT cover
   if (hasCover && coverImg) {
-    const coverX = CARD_WIDTH - PAD_X - COVER_SIZE - STACK_OFFSET
-    const coverY = PAD_TOP + STACK_OFFSET + Math.max(0, (contentH - coverBlockH) / 2)
-    drawStackedCover(
+    const coverX = CARD_WIDTH - PAD_X - COVER_SIZE
+    const coverY = headerTop + Math.max(0, (headerH - COVER_SIZE) / 2)
+    drawCoverContain(
       ctx,
       coverImg,
-      secondImg,
       coverX,
       coverY,
       COVER_SIZE,
@@ -514,21 +484,41 @@ export async function downloadPromptCard(
     )
   }
 
-  // BOTTOM CTA bar
+  // ——— DIVIDER ———
+  const dividerY = PAD_TOP + headerH + dividerGap / 2
+  ctx.strokeStyle = palette.softBorder
+  ctx.lineWidth = 1.25
+  ctx.beginPath()
+  ctx.moveTo(PAD_X, dividerY)
+  ctx.lineTo(CARD_WIDTH - PAD_X, dividerY)
+  ctx.stroke()
+
+  // ——— PROMPT BODY ———
+  const bodyStartY = PAD_TOP + headerH + dividerGap + BODY_PAD_Y
+  ctx.fillStyle = '#2a2a32'
+  ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  let by = bodyStartY
+  for (const line of bodyLines) {
+    ctx.fillText(line, PAD_X, by)
+    by += bodyLineH
+  }
+
+  // ——— FOOTER CTA ———
   const footerY = height - FOOTER_H
   ctx.fillStyle = palette.soft
   ctx.fillRect(0, footerY, CARD_WIDTH, FOOTER_H)
 
-  // Measure CTA cluster and right-align
   ctx.font = `500 ${CTA_SIZE}px ${FONT_STACK}`
   const beforeW = ctx.measureText(CTA_BEFORE).width
   const afterW = ctx.measureText(CTA_AFTER).width
-  const gapBefore = 8
-  const gapAfter = 8
+  const gapBefore = 7
+  const gapAfter = 7
   ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
   const brandTw = ctx.measureText(CTA_BRAND).width
-  const brandPadX = 10
-  const brandPadY = 5
+  const brandPadX = 9
+  const brandPadY = 4
   const brandW = brandTw + brandPadX * 2
   const brandH = CTA_SIZE + brandPadY * 2
   const clusterW = beforeW + gapBefore + brandW + gapAfter + afterW
@@ -542,7 +532,7 @@ export async function downloadPromptCard(
   ctx.fillText(CTA_BEFORE, cx, midY)
   cx += beforeW + gapBefore
 
-  roundRect(ctx, cx, midY - brandH / 2, brandW, brandH, 7)
+  roundRect(ctx, cx, midY - brandH / 2, brandW, brandH, 6)
   ctx.fillStyle = palette.accent
   ctx.fill()
   ctx.font = `700 ${CTA_SIZE}px ${FONT_STACK}`
@@ -558,7 +548,6 @@ export async function downloadPromptCard(
 
   ctx.restore()
 
-  // Outer border again on top of clip for crisp edge
   roundRect(ctx, 1, 1, CARD_WIDTH - 2, height - 2, CARD_RADIUS - 1)
   ctx.strokeStyle = palette.border
   ctx.lineWidth = 2
@@ -575,7 +564,6 @@ export async function downloadPromptCard(
   triggerDownload(blob, filename)
 }
 
-/** Exported for tests / debugging */
 export const PROMPT_CARD_PALETTE_NAMES: PaletteName[] = PALETTES.map(
   (p) => p.name,
 )
