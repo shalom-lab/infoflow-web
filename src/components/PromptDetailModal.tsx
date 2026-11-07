@@ -130,11 +130,11 @@ export function PromptDetailModal({
     setDownloaded(false)
     try {
       await downloadPromptCard({
-        content: prompt.content,
         replyKeyword: replyKeyword || undefined,
         title: prompt.wechat_title?.trim() || undefined,
         keywords: prompt.keywords,
         coverUrl: urls[0] ?? coverUrl ?? undefined,
+        secondCoverUrl: urls[1] ?? undefined,
       })
       setDownloaded(true)
       window.setTimeout(() => setDownloaded(false), 1800)
