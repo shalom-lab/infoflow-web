@@ -468,7 +468,11 @@ function layoutFloatedBodyLines(
   fullWidth: number,
   floatW: number,
   floatH: number,
-): { lines: { text: string; width: number; y: number }[]; height: number } {
+): {
+  lines: { text: string; width: number; y: number }[]
+  textHeight: number
+  height: number
+} {
   const prepared = prepareWithSegments(content, BODY_FONT, {
     whiteSpace: 'pre-wrap',
   })
@@ -490,7 +494,7 @@ function layoutFloatedBodyLines(
     y += BODY_LINE_H
   }
 
-  return { lines, height: Math.max(y, floatH) }
+  return { lines, textHeight: y, height: Math.max(y, floatH) }
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -599,10 +603,23 @@ export async function generatePromptCard(
     Math.max(0, thumbs.length - 1) * THUMB_GAP
 
   const floatMaxW = Math.floor(contentW * FLOAT_WIDTH_RATIO)
-  const floatCol = layoutFloatStack(
-    loaded.slice(0, MAX_FLOAT_IMAGES),
-    floatMaxW,
-  )
+  // Default: one large current image. Add a 2nd float only when text is long
+  // enough to fill the space beside a two-image stack (avoid empty lower-left).
+  const floatOne = layoutFloatStack(loaded.slice(0, 1), floatMaxW)
+  let floatCol = floatOne
+  if (loaded.length >= 2) {
+    const floatTwo = layoutFloatStack(loaded.slice(0, 2), floatMaxW)
+    const probe = layoutFloatedBodyLines(
+      content || ' ',
+      contentW,
+      floatTwo.colW,
+      floatTwo.colH,
+    )
+    const emptyBelow = floatTwo.colH - probe.textHeight
+    const emptyOk =
+      emptyBelow <= Math.max(64, Math.round(floatTwo.colH * 0.12))
+    if (emptyOk) floatCol = floatTwo
+  }
   const bodyLayout = layoutFloatedBodyLines(
     content || ' ',
     contentW,
