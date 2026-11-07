@@ -231,6 +231,21 @@ export function HomePage({ settings }: Props) {
     }
   }, [filtersOpen])
 
+  // Esc exits select mode + clears selection; never steal Esc from open dialogs.
+  useEffect(() => {
+    if (!selectMode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (cartOpen || detailPrompt) return
+      if (document.querySelector('[aria-modal="true"]')) return
+      e.preventDefault()
+      setSelectMode(false)
+      void clearSelected()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectMode, cartOpen, detailPrompt, clearSelected])
+
   // On first open: if clipboard has text and search is still empty, prefill query.
   useEffect(() => {
     let cancelled = false
