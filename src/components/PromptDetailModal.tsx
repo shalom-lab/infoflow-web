@@ -3,7 +3,10 @@ import type { GithubSettings } from '../github/types'
 import { usePromptImages } from '../hooks/usePromptImages'
 import type { PromptItem } from '../types/prompt'
 import { copyText } from '../utils/copy'
-import { downloadPromptCard } from '../utils/downloadPromptCard'
+import {
+  copyPromptCardImage,
+  downloadPromptCard,
+} from '../utils/downloadPromptCard'
 import { TagCapsule } from './TagCapsule'
 
 interface Props {
@@ -52,6 +55,29 @@ function DownloadIcon() {
   )
 }
 
+/** Copy-image glyph: image frame + small spark (distinct from text copy). */
+function CopyImageIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <circle cx="9" cy="11" r="1.5" />
+      <path d="M3 16l4-4 3 3 2-2 5 5" />
+      <path d="M17 3h4v4" />
+      <path d="M14 10l7-7" />
+    </svg>
+  )
+}
+
 export function PromptDetailModal({
   prompt,
   settings,
@@ -69,6 +95,8 @@ export function PromptDetailModal({
   const [kwCopied, setKwCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
+  const [copyingImage, setCopyingImage] = useState(false)
+  const [imageCopied, setImageCopied] = useState(false)
 
   const title = prompt.wechat_title || prompt.reply_keyword || '(无标题)'
   const replyKeyword = prompt.reply_keyword?.trim() || ''
@@ -80,6 +108,8 @@ export function PromptDetailModal({
     setCopied(false)
     setDownloading(false)
     setDownloaded(false)
+    setCopyingImage(false)
+    setImageCopied(false)
   }, [prompt.prompt_id])
 
   useEffect(() => {
@@ -124,18 +154,20 @@ export function PromptDetailModal({
     }
   }
 
+  const cardOptions = () => ({
+    content: prompt.content,
+    replyKeyword: replyKeyword || undefined,
+    title: prompt.wechat_title?.trim() || undefined,
+    keywords: prompt.keywords,
+    coverUrl: urls[0] ?? coverUrl ?? undefined,
+  })
+
   const handleDownload = async () => {
-    if (downloading) return
+    if (downloading || copyingImage) return
     setDownloading(true)
     setDownloaded(false)
     try {
-      await downloadPromptCard({
-        content: prompt.content,
-        replyKeyword: replyKeyword || undefined,
-        title: prompt.wechat_title?.trim() || undefined,
-        keywords: prompt.keywords,
-        coverUrl: urls[0] ?? coverUrl ?? undefined,
-      })
+      await downloadPromptCard(cardOptions())
       setDownloaded(true)
       window.setTimeout(() => setDownloaded(false), 1800)
     } catch {
@@ -145,12 +177,34 @@ export function PromptDetailModal({
     }
   }
 
+  const handleCopyImage = async () => {
+    if (copyingImage || downloading) return
+    setCopyingImage(true)
+    setImageCopied(false)
+    try {
+      const ok = await copyPromptCardImage(cardOptions())
+      if (ok) {
+        setImageCopied(true)
+        window.setTimeout(() => setImageCopied(false), 1800)
+      }
+    } catch {
+      // unsupported / denied — silent
+    } finally {
+      setCopyingImage(false)
+    }
+  }
+
   const copyLabel = copied ? '已复制' : '复制提示词'
   const downloadLabel = downloading
     ? '生成中…'
     : downloaded
       ? '已下载'
       : '下载提示词图片'
+  const copyImageLabel = copyingImage
+    ? '生成中…'
+    : imageCopied
+      ? '图片已复制'
+      : '复制提示词图片'
 
   return (
     <div
@@ -249,11 +303,23 @@ export function PromptDetailModal({
                     downloaded ? ' ok' : ''
                   }${downloading ? ' busy' : ''}`}
                   onClick={() => void handleDownload()}
-                  disabled={downloading}
+                  disabled={downloading || copyingImage}
                   title={downloadLabel}
                   aria-label={downloadLabel}
                 >
                   {downloaded ? '✓' : <DownloadIcon />}
+                </button>
+                <button
+                  type="button"
+                  className={`detail-icon-btn detail-copy-image-btn${
+                    imageCopied ? ' ok' : ''
+                  }${copyingImage ? ' busy' : ''}`}
+                  onClick={() => void handleCopyImage()}
+                  disabled={copyingImage || downloading}
+                  title={copyImageLabel}
+                  aria-label={copyImageLabel}
+                >
+                  {imageCopied ? '✓' : <CopyImageIcon />}
                 </button>
                 <button
                   type="button"

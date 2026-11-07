@@ -386,12 +386,33 @@ function triggerDownload(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
+export type PromptCardResult = {
+  blob: Blob
+  filename: string
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  mime: 'image/jpeg' | 'image/png',
+  quality = 0.92,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('生成图片失败'))),
+      mime,
+      mime === 'image/jpeg' ? quality : undefined,
+    )
+  })
+}
+
 /**
- * Header (meta + tight cover) → CTA bar under header → prompt body → JPEG.
+ * Shared card renderer used by download + clipboard image copy.
+ * Header (meta + tight cover) → CTA bar → prompt body.
  */
-export async function downloadPromptCard(
+export async function generatePromptCard(
   options: PromptCardOptions,
-): Promise<void> {
+  mime: 'image/jpeg' | 'image/png' = 'image/jpeg',
+): Promise<PromptCardResult> {
   const content = (options.content ?? '').replace(/\r\n/g, '\n')
   const replyKeyword = (options.replyKeyword ?? '').trim()
   const title = (options.title ?? '').trim()
@@ -468,7 +489,6 @@ export async function downloadPromptCard(
   roundRect(ctx, 0, 0, CARD_WIDTH, height, CARD_RADIUS)
   ctx.clip()
 
-  // ——— HEADER ———
   const headerTop = PAD_TOP
   const leftTop = headerTop + Math.max(0, (headerH - leftColH) / 2)
   let y = leftTop
@@ -536,11 +556,9 @@ export async function downloadPromptCard(
     )
   }
 
-  // ——— CTA BAR (under header, not at bottom) ———
   const ctaY = PAD_TOP + headerH + afterHeaderGap
   drawCtaBar(ctx, ctaY, palette)
 
-  // ——— PROMPT BODY ———
   const bodyStartY = ctaY + CTA_BAR_H + BODY_PAD_Y
   ctx.fillStyle = '#2a2a32'
   ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
@@ -559,15 +577,39 @@ export async function downloadPromptCard(
   ctx.lineWidth = 2
   ctx.stroke()
 
-  const filename = `${buildFilename(replyKeyword)}.jpg`
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error('生成图片失败'))),
-      'image/jpeg',
-      0.92,
-    )
-  })
+  const ext = mime === 'image/png' ? 'png' : 'jpg'
+  const filename = `${buildFilename(replyKeyword)}.${ext}`
+  const blob = await canvasToBlob(canvas, mime)
+  return { blob, filename }
+}
+
+/** Download the prompt card as JPEG. */
+export async function downloadPromptCard(
+  options: PromptCardOptions,
+): Promise<void> {
+  const { blob, filename } = await generatePromptCard(options, 'image/jpeg')
   triggerDownload(blob, filename)
+}
+
+/**
+ * Copy the prompt-card image to the system clipboard (PNG for ClipboardItem).
+ * Returns false if clipboard write is unsupported / denied.
+ */
+export async function copyPromptCardImage(
+  options: PromptCardOptions,
+): Promise<boolean> {
+  const { blob } = await generatePromptCard(options, 'image/png')
+  if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+    return false
+  }
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ [blob.type]: blob }),
+    ])
+    return true
+  } catch {
+    return false
+  }
 }
 
 export const PROMPT_CARD_PALETTE_NAMES: PaletteName[] = PALETTES.map(
