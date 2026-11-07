@@ -159,7 +159,8 @@ export function PromptDetailModal({
     replyKeyword: replyKeyword || undefined,
     title: prompt.wechat_title?.trim() || undefined,
     keywords: prompt.keywords,
-    coverUrl: currentUrl ?? coverUrl ?? undefined,
+    imageUrls: urls.length > 0 ? urls : coverUrl ? [coverUrl] : [],
+    imageIndex: index,
   })
 
   const handleDownload = async () => {
