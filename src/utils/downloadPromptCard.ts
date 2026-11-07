@@ -1,41 +1,50 @@
 /**
  * Downloadable prompt card JPEG for the detail modal.
- * Compact header (left meta height-capped; right-aligned ≤3 thumbs from
- * current gallery index, wrap) → CTA bar → full prompt body.
- * Accent palette random among 5 themes.
+ *
+ * Compact header meta → CTA bar → body where large gallery image(s)
+ * float right and prompt text wraps around them via @chenglou/pretext
+ * (layoutNextLineRange), matching the pretext rich-text float demo.
  */
+
+import {
+  layoutNextLineRange,
+  materializeLineRange,
+  prepareWithSegments,
+  type LayoutCursor,
+} from '@chenglou/pretext'
 
 const CARD_WIDTH = 1080
 const CARD_RADIUS = 22
 const PAD_X = 32
-const PAD_TOP = 28
-const BODY_PAD_Y = 20
+const PAD_TOP = 24
+const BODY_PAD_Y = 18
 const PAD_BOTTOM_BODY = 28
 const CTA_BAR_H = 48
-const TITLE_SIZE = 30
+const TITLE_SIZE = 28
 const TITLE_LINE_GAP = 4
 const BODY_SIZE = 16
-const BODY_LINE_GAP = 6
-const RELAY_FONT = 15
-const RELAY_PAD_X = 14
-const RELAY_PAD_Y = 6
-const PILL_FONT = 13
-const PILL_PAD_X = 10
-const PILL_PAD_Y = 5
+const BODY_LINE_H = 24
+const RELAY_FONT = 14
+const RELAY_PAD_X = 12
+const RELAY_PAD_Y = 5
+const PILL_FONT = 12
+const PILL_PAD_X = 9
+const PILL_PAD_Y = 4
 const PILL_GAP = 6
 const PILL_ROW_GAP = 6
 const CTA_SIZE = 14
-const COVER_RADIUS = 12
-const LEFT_RIGHT_GAP = 20
-const THUMB_GAP = 8
-const MAX_THUMBS = 3
-/** Reserved right band for thumbs (left meta uses the rest). */
-const RIGHT_RESERVE_RATIO = 0.48
-const META_GAP = 12
-const HEADER_MIN_H = 72
+const COVER_RADIUS = 14
+const META_GAP = 10
+const FLOAT_GAP = 12
+const FLOAT_STACK_GAP = 10
+const MAX_FLOAT_IMAGES = 2
+/** Max share of content width for the floated image column */
+const FLOAT_WIDTH_RATIO = 0.44
+const FLOAT_MAX_H_EACH = 420
 
 const FONT_STACK =
   '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif'
+const BODY_FONT = `400 ${BODY_SIZE}px ${FONT_STACK}`
 
 const CTA_BEFORE = '更多提示词，请关注'
 const CTA_BRAND = '图美AI'
@@ -106,14 +115,8 @@ export type PromptCardOptions = {
   replyKeyword?: string
   title?: string
   keywords?: string[]
-  /**
-   * Gallery image URLs. Thumbs start at imageIndex, then next, wrapping.
-   * Max 3 shown, packed by aspect into the right band.
-   */
   imageUrls?: string[]
-  /** Currently viewed gallery index (default 0). */
   imageIndex?: number
-  /** Fallback single cover when imageUrls empty. */
   coverUrl?: string
 }
 
@@ -301,14 +304,9 @@ async function loadCoverImage(
   }
 }
 
-/** Ordered gallery URLs starting at current index, wrapping. */
-function orderedGalleryUrls(
-  urls: string[],
-  imageIndex: number,
-): string[] {
+function orderedGalleryUrls(urls: string[], imageIndex: number): string[] {
   if (urls.length === 0) return []
-  const start =
-    ((imageIndex % urls.length) + urls.length) % urls.length
+  const start = ((imageIndex % urls.length) + urls.length) % urls.length
   const out: string[] = []
   for (let i = 0; i < urls.length; i++) {
     out.push(urls[(start + i) % urls.length]!)
@@ -316,56 +314,35 @@ function orderedGalleryUrls(
   return out
 }
 
-type ThumbSlot = {
-  img: HTMLImageElement
-  w: number
-  h: number
-}
+type FloatSlot = { img: HTMLImageElement; w: number; h: number }
 
-/**
- * Pack ≤3 thumbs into maxW × targetH.
- * Height prefers targetH (yellow-box / left meta band); width from aspect.
- * Landscape may fill with 1–2; portrait up to 3. Right-aligned later.
- */
-function packThumbs(
+/** Scale images into a right float column (stacked), aspect preserved. */
+function layoutFloatStack(
   images: HTMLImageElement[],
-  targetH: number,
-  maxW: number,
-): ThumbSlot[] {
-  if (images.length === 0 || targetH <= 0 || maxW <= 0) return []
-  const H = Math.max(24, targetH)
-  const slots: ThumbSlot[] = []
-  let used = 0
-
-  for (const img of images.slice(0, MAX_THUMBS)) {
-    const aspect = img.naturalWidth / img.naturalHeight
-    let w = Math.max(1, Math.round(H * aspect))
-    let h = H
-    const gap = slots.length > 0 ? THUMB_GAP : 0
-    const need = gap + w
-
-    if (used + need <= maxW) {
-      slots.push({ img, w, h })
-      used += need
-      continue
-    }
-
-    if (slots.length === 0) {
-      // First image alone too wide at targetH — scale to fit maxW
-      const scale = maxW / w
-      w = maxW
-      h = Math.max(1, Math.round(H * scale))
-      slots.push({ img, w, h })
-    }
-    break
+  maxColW: number,
+): { slots: FloatSlot[]; colW: number; colH: number } {
+  if (images.length === 0 || maxColW <= 0) {
+    return { slots: [], colW: 0, colH: 0 }
   }
-  return slots
+  const slots: FloatSlot[] = []
+  let colW = 0
+  let colH = 0
+  for (const img of images.slice(0, MAX_FLOAT_IMAGES)) {
+    const scale = Math.min(
+      maxColW / img.naturalWidth,
+      FLOAT_MAX_H_EACH / img.naturalHeight,
+      1,
+    )
+    const w = Math.max(1, Math.round(img.naturalWidth * scale))
+    const h = Math.max(1, Math.round(img.naturalHeight * scale))
+    if (slots.length > 0) colH += FLOAT_STACK_GAP
+    slots.push({ img, w, h })
+    colW = Math.max(colW, w)
+    colH += h
+  }
+  return { slots, colW, colH }
 }
 
-/**
- * Draw image at exact aspect size with a tight border hugging the pixels.
- * No white letterbox / fixed square frame.
- */
 function drawCoverTight(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -381,7 +358,6 @@ function drawCoverTight(
   ctx.clip()
   ctx.drawImage(img, x, y, w, h)
   ctx.restore()
-
   roundRect(ctx, x, y, w, h, radius)
   ctx.strokeStyle = borderColor
   ctx.lineWidth = 1.5
@@ -433,6 +409,40 @@ function drawCtaBar(
   ctx.fillText(CTA_AFTER, cx, midY)
 }
 
+/**
+ * Flow prompt text with variable line widths around a floated image column
+ * using @chenglou/pretext layoutNextLineRange (same pattern as their demos).
+ */
+function layoutFloatedBodyLines(
+  content: string,
+  fullWidth: number,
+  floatW: number,
+  floatH: number,
+): { lines: { text: string; width: number; y: number }[]; height: number } {
+  const prepared = prepareWithSegments(content, BODY_FONT, {
+    whiteSpace: 'pre-wrap',
+  })
+  const lines: { text: string; width: number; y: number }[] = []
+  let cursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 }
+  let y = 0
+  const gap = floatW > 0 ? FLOAT_GAP : 0
+
+  while (true) {
+    const maxW =
+      floatW > 0 && y < floatH
+        ? Math.max(80, fullWidth - floatW - gap)
+        : fullWidth
+    const range = layoutNextLineRange(prepared, maxW, cursor)
+    if (range === null) break
+    const line = materializeLineRange(prepared, range)
+    lines.push({ text: line.text, width: line.width, y })
+    cursor = range.end
+    y += BODY_LINE_H
+  }
+
+  return { lines, height: Math.max(y, floatH) }
+}
+
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -465,8 +475,7 @@ function canvasToBlob(
 }
 
 /**
- * Shared card renderer used by download + clipboard image copy.
- * Header (meta height-capped + ≤3 right thumbs) → CTA bar → prompt body.
+ * Shared card renderer: compact header meta → CTA → floated image(s) + wrap text.
  */
 export async function generatePromptCard(
   options: PromptCardOptions,
@@ -480,14 +489,16 @@ export async function generatePromptCard(
   )
   const palette = pickPalette()
 
-  const rawUrls = (options.imageUrls ?? []).map((u) => u.trim()).filter(Boolean)
+  const rawUrls = [...(options.imageUrls ?? [])]
+    .map((u) => u.trim())
+    .filter(Boolean)
   if (rawUrls.length === 0 && options.coverUrl?.trim()) {
     rawUrls.push(options.coverUrl.trim())
   }
   const orderedUrls = orderedGalleryUrls(rawUrls, options.imageIndex ?? 0)
   const loaded = (
     await Promise.all(
-      orderedUrls.slice(0, MAX_THUMBS).map((u) => loadCoverImage(u)),
+      orderedUrls.slice(0, MAX_FLOAT_IMAGES).map((u) => loadCoverImage(u)),
     )
   ).filter((img): img is HTMLImageElement => img != null)
 
@@ -496,11 +507,8 @@ export async function generatePromptCard(
   if (!measure) throw new Error('Canvas 不可用')
 
   const contentW = CARD_WIDTH - PAD_X * 2
-  const rightMax = loaded.length
-    ? Math.floor(contentW * RIGHT_RESERVE_RATIO)
-    : 0
-  const leftMaxW =
-    contentW - (rightMax > 0 ? rightMax + LEFT_RIGHT_GAP : 0)
+  // Compact header uses full content width (images live in the body float)
+  const leftMaxW = contentW
 
   const relayPill = replyKeyword
     ? measurePill(
@@ -517,37 +525,30 @@ export async function generatePromptCard(
   const titleLines = title ? wrapLines(measure, title, leftMaxW) : []
   const titleLineH = TITLE_SIZE + TITLE_LINE_GAP
   const titleBlockH = titleLines.length * titleLineH
-
   const pillLayout = layoutPills(measure, keywords, leftMaxW)
 
-  const leftColH = Math.max(
-    HEADER_MIN_H,
+  const headerH =
     (relayPill ? relayPill.height + META_GAP : 0) +
-      (titleBlockH > 0 ? titleBlockH + META_GAP : 0) +
-      pillLayout.height,
+    (titleBlockH > 0 ? titleBlockH + META_GAP : 0) +
+    pillLayout.height
+
+  const floatMaxW = Math.floor(contentW * FLOAT_WIDTH_RATIO)
+  const floatCol = layoutFloatStack(loaded, floatMaxW)
+  const bodyLayout = layoutFloatedBodyLines(
+    content || ' ',
+    contentW,
+    floatCol.colW,
+    floatCol.colH,
   )
 
-  // Header height = yellow-box / left meta band (thumbs capped to this)
-  const headerH = leftColH
-  const thumbs = packThumbs(loaded, headerH, rightMax)
-  const thumbsRowW =
-    thumbs.reduce((s, t) => s + t.w, 0) +
-    Math.max(0, thumbs.length - 1) * THUMB_GAP
-
-  const textWidth = CARD_WIDTH - PAD_X * 2
-  measure.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
-  const bodyLines = wrapLines(measure, content, textWidth)
-  const bodyLineH = BODY_SIZE + BODY_LINE_GAP
-  const bodyBlockH = Math.max(bodyLines.length, 1) * bodyLineH
-
-  const afterHeaderGap = 16
+  const afterHeaderGap = 14
   const height = Math.ceil(
     PAD_TOP +
       headerH +
       afterHeaderGap +
       CTA_BAR_H +
       BODY_PAD_Y +
-      bodyBlockH +
+      bodyLayout.height +
       PAD_BOTTOM_BODY,
   )
 
@@ -566,9 +567,8 @@ export async function generatePromptCard(
   roundRect(ctx, 0, 0, CARD_WIDTH, height, CARD_RADIUS)
   ctx.clip()
 
-  const headerTop = PAD_TOP
-  let y = headerTop
-
+  // ——— Compact header meta ———
+  let y = PAD_TOP
   if (relayPill) {
     drawFilledPill(
       ctx,
@@ -582,7 +582,6 @@ export async function generatePromptCard(
     )
     y += relayPill.height + META_GAP
   }
-
   if (titleLines.length > 0) {
     ctx.fillStyle = '#1a1a1f'
     ctx.font = `700 ${TITLE_SIZE}px ${FONT_STACK}`
@@ -594,7 +593,6 @@ export async function generatePromptCard(
     }
     y += META_GAP - TITLE_LINE_GAP
   }
-
   if (pillLayout.rows.length > 0) {
     let py = y
     for (const row of pillLayout.rows) {
@@ -617,37 +615,43 @@ export async function generatePromptCard(
     }
   }
 
-  // Right-aligned thumb row (current → next → wrap), height ≤ header band
-  if (thumbs.length > 0) {
-    let tx = CARD_WIDTH - PAD_X - thumbsRowW
-    for (const slot of thumbs) {
-      const ty = headerTop + Math.max(0, (headerH - slot.h) / 2)
+  // ——— CTA under header ———
+  const ctaY = PAD_TOP + headerH + afterHeaderGap
+  drawCtaBar(ctx, ctaY, palette)
+
+  // ——— Body: float images + pretext-wrapped text ———
+  const bodyStartY = ctaY + CTA_BAR_H + BODY_PAD_Y
+
+  if (floatCol.slots.length > 0) {
+    let fy = bodyStartY
+    const floatLeft = CARD_WIDTH - PAD_X - floatCol.colW
+    for (const slot of floatCol.slots) {
+      const fx = floatLeft + (floatCol.colW - slot.w) // right-align within column
       drawCoverTight(
         ctx,
         slot.img,
-        tx,
-        ty,
+        fx,
+        fy,
         slot.w,
         slot.h,
         COVER_RADIUS,
         palette.accent,
       )
-      tx += slot.w + THUMB_GAP
+      fy += slot.h + FLOAT_STACK_GAP
     }
   }
 
-  const ctaY = PAD_TOP + headerH + afterHeaderGap
-  drawCtaBar(ctx, ctaY, palette)
-
-  const bodyStartY = ctaY + CTA_BAR_H + BODY_PAD_Y
   ctx.fillStyle = '#2a2a32'
-  ctx.font = `400 ${BODY_SIZE}px ${FONT_STACK}`
+  ctx.font = BODY_FONT
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  let by = bodyStartY
-  for (const line of bodyLines) {
-    ctx.fillText(line, PAD_X, by)
-    by += bodyLineH
+  for (const line of bodyLayout.lines) {
+    // Soft-trim trailing spaces that hang past wrap (pretext keeps them in text)
+    const drawText = line.text.replace(/[ \t]+$/u, '')
+    if (drawText.length === 0 && line.text.length === 0) {
+      // blank line from pre-wrap — still advances via y
+    }
+    ctx.fillText(drawText, PAD_X, bodyStartY + line.y)
   }
 
   ctx.restore()
@@ -663,7 +667,6 @@ export async function generatePromptCard(
   return { blob, filename }
 }
 
-/** Download the prompt card as JPEG. */
 export async function downloadPromptCard(
   options: PromptCardOptions,
 ): Promise<void> {
@@ -671,10 +674,6 @@ export async function downloadPromptCard(
   triggerDownload(blob, filename)
 }
 
-/**
- * Copy the prompt-card image to the system clipboard (PNG for ClipboardItem).
- * Returns false if clipboard write is unsupported / denied.
- */
 export async function copyPromptCardImage(
   options: PromptCardOptions,
 ): Promise<boolean> {
