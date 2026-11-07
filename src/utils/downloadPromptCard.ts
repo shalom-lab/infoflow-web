@@ -1,9 +1,9 @@
 /**
  * Downloadable prompt card JPEG for the detail modal.
  *
- * Compact header meta → CTA bar → body where large gallery image(s)
- * float right and prompt text wraps around them via @chenglou/pretext
- * (layoutNextLineRange), matching the pretext rich-text float demo.
+ * Compact header (meta + right-aligned ≤3 thumbs) → CTA bar → body where
+ * large gallery image(s) float right and prompt text wraps via
+ * @chenglou/pretext layoutNextLineRange.
  */
 
 import {
@@ -34,7 +34,13 @@ const PILL_GAP = 6
 const PILL_ROW_GAP = 6
 const CTA_SIZE = 14
 const COVER_RADIUS = 14
+const THUMB_RADIUS = 10
 const META_GAP = 10
+const LEFT_RIGHT_GAP = 20
+const THUMB_GAP = 8
+const MAX_THUMBS = 3
+const RIGHT_RESERVE_RATIO = 0.48
+const HEADER_MIN_H = 72
 const FLOAT_GAP = 12
 const FLOAT_STACK_GAP = 10
 const MAX_FLOAT_IMAGES = 2
@@ -314,6 +320,50 @@ function orderedGalleryUrls(urls: string[], imageIndex: number): string[] {
   return out
 }
 
+type ThumbSlot = {
+  img: HTMLImageElement
+  w: number
+  h: number
+}
+
+/**
+ * Pack ≤3 header thumbs into maxW × targetH (yellow-box / left meta band).
+ * Height prefers targetH; width from aspect. Landscape may fill with 1–2.
+ */
+function packThumbs(
+  images: HTMLImageElement[],
+  targetH: number,
+  maxW: number,
+): ThumbSlot[] {
+  if (images.length === 0 || targetH <= 0 || maxW <= 0) return []
+  const H = Math.max(24, targetH)
+  const slots: ThumbSlot[] = []
+  let used = 0
+
+  for (const img of images.slice(0, MAX_THUMBS)) {
+    const aspect = img.naturalWidth / img.naturalHeight
+    let w = Math.max(1, Math.round(H * aspect))
+    let h = H
+    const gap = slots.length > 0 ? THUMB_GAP : 0
+    const need = gap + w
+
+    if (used + need <= maxW) {
+      slots.push({ img, w, h })
+      used += need
+      continue
+    }
+
+    if (slots.length === 0) {
+      const scale = maxW / w
+      w = maxW
+      h = Math.max(1, Math.round(H * scale))
+      slots.push({ img, w, h })
+    }
+    break
+  }
+  return slots
+}
+
 type FloatSlot = { img: HTMLImageElement; w: number; h: number }
 
 /** Scale images into a right float column (stacked), aspect preserved. */
@@ -475,7 +525,7 @@ function canvasToBlob(
 }
 
 /**
- * Shared card renderer: compact header meta → CTA → floated image(s) + wrap text.
+ * Shared card renderer: header meta + ≤3 thumbs → CTA → floated image(s) + wrap text.
  */
 export async function generatePromptCard(
   options: PromptCardOptions,
@@ -496,9 +546,14 @@ export async function generatePromptCard(
     rawUrls.push(options.coverUrl.trim())
   }
   const orderedUrls = orderedGalleryUrls(rawUrls, options.imageIndex ?? 0)
+  // Load enough for header thumbs (≤3) and body floats (≤2); same ordered list.
+  const loadCount = Math.min(
+    orderedUrls.length,
+    Math.max(MAX_THUMBS, MAX_FLOAT_IMAGES),
+  )
   const loaded = (
     await Promise.all(
-      orderedUrls.slice(0, MAX_FLOAT_IMAGES).map((u) => loadCoverImage(u)),
+      orderedUrls.slice(0, loadCount).map((u) => loadCoverImage(u)),
     )
   ).filter((img): img is HTMLImageElement => img != null)
 
@@ -507,8 +562,11 @@ export async function generatePromptCard(
   if (!measure) throw new Error('Canvas 不可用')
 
   const contentW = CARD_WIDTH - PAD_X * 2
-  // Compact header uses full content width (images live in the body float)
-  const leftMaxW = contentW
+  const rightMax = loaded.length
+    ? Math.floor(contentW * RIGHT_RESERVE_RATIO)
+    : 0
+  const leftMaxW =
+    contentW - (rightMax > 0 ? rightMax + LEFT_RIGHT_GAP : 0)
 
   const relayPill = replyKeyword
     ? measurePill(
@@ -527,13 +585,24 @@ export async function generatePromptCard(
   const titleBlockH = titleLines.length * titleLineH
   const pillLayout = layoutPills(measure, keywords, leftMaxW)
 
-  const headerH =
+  const leftColH = Math.max(
+    HEADER_MIN_H,
     (relayPill ? relayPill.height + META_GAP : 0) +
-    (titleBlockH > 0 ? titleBlockH + META_GAP : 0) +
-    pillLayout.height
+      (titleBlockH > 0 ? titleBlockH + META_GAP : 0) +
+      pillLayout.height,
+  )
+  // Header height capped to left meta band (yellow box); thumbs fit inside
+  const headerH = leftColH
+  const thumbs = packThumbs(loaded, headerH, rightMax)
+  const thumbsRowW =
+    thumbs.reduce((s, t) => s + t.w, 0) +
+    Math.max(0, thumbs.length - 1) * THUMB_GAP
 
   const floatMaxW = Math.floor(contentW * FLOAT_WIDTH_RATIO)
-  const floatCol = layoutFloatStack(loaded, floatMaxW)
+  const floatCol = layoutFloatStack(
+    loaded.slice(0, MAX_FLOAT_IMAGES),
+    floatMaxW,
+  )
   const bodyLayout = layoutFloatedBodyLines(
     content || ' ',
     contentW,
@@ -612,6 +681,25 @@ export async function generatePromptCard(
         px += pill.width + PILL_GAP
       }
       py += pillLayout.pillH + PILL_ROW_GAP
+    }
+  }
+
+  // ——— Header right-aligned thumbs (current → next → wrap) ———
+  if (thumbs.length > 0) {
+    let tx = CARD_WIDTH - PAD_X - thumbsRowW
+    for (const slot of thumbs) {
+      const ty = PAD_TOP + Math.max(0, (headerH - slot.h) / 2)
+      drawCoverTight(
+        ctx,
+        slot.img,
+        tx,
+        ty,
+        slot.w,
+        slot.h,
+        THUMB_RADIUS,
+        palette.accent,
+      )
+      tx += slot.w + THUMB_GAP
     }
   }
 
